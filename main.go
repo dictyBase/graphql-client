@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/hasura/go-graphql-client"
@@ -14,7 +13,6 @@ import (
 const (
 	tabPadding   = 3
 	defaultLimit = 10
-	defaultTypes = "ALL"
 )
 
 const (
@@ -33,34 +31,21 @@ type PlasmidListFilter struct {
 
 func (PlasmidListFilter) GetGraphQLType() string { return "PlasmidListFilter" }
 
-func parsePlasmidTypes(typesStr string) (PlasmidType, error) {
-	if typesStr == "" || typesStr == defaultTypes {
-		return PlasmidTypeAll, nil
-	}
+var validPlasmidTypes = map[PlasmidType]bool{
+	PlasmidTypeAll:         true,
+	PlasmidTypeRegular:     true,
+	PlasmidTypeGoldenBraid: true,
+}
 
-	typesList := strings.Split(typesStr, ",")
-	validTypes := make(map[PlasmidType]bool)
-	for _, t := range typesList {
-		t = strings.TrimSpace(t)
-		validTypes[PlasmidType(t)] = true
+func parsePlasmidType(s string) (PlasmidType, error) {
+	pt := PlasmidType(s)
+	if !validPlasmidTypes[pt] {
+		return "", fmt.Errorf(
+			"invalid plasmid type: %s, must be one of: ALL, REGULAR, GOLDEN_BRAID",
+			pt,
+		)
 	}
-
-	// Check if all specified types are valid
-	for t := range validTypes {
-		if t != PlasmidTypeAll && t != PlasmidTypeRegular && t != PlasmidTypeGoldenBraid {
-			return "", fmt.Errorf("invalid plasmid type: %s", t)
-		}
-	}
-
-	// If only one type is specified, use it
-	if len(validTypes) == 1 {
-		for t := range validTypes {
-			return t, nil
-		}
-	}
-
-	// Multiple valid types selected - use ALL as default
-	return PlasmidTypeAll, nil
+	return pt, nil
 }
 
 type Plasmid struct {
@@ -72,7 +57,7 @@ type Plasmid struct {
 
 type ListPlasmidsQuery struct {
 	ListPlasmids struct {
-		NextCursor int       `graphql:"nextCursor"`
+		NextCursor int64     `graphql:"nextCursor"`
 		TotalCount int       `graphql:"totalCount"`
 		Plasmids   []Plasmid `graphql:"plasmids"`
 	} `graphql:"listPlasmids(cursor: $cursor, limit: $limit, filter: $filter)"`
@@ -80,9 +65,9 @@ type ListPlasmidsQuery struct {
 
 func listPlasmidsAction(ctx context.Context, cmd *cli.Command) error {
 	query := new(ListPlasmidsQuery)
-	filterPlasmidType, err := parsePlasmidTypes(cmd.String("types"))
+	filterPlasmidType, err := parsePlasmidType(cmd.String("type"))
 	if err != nil {
-		return fmt.Errorf("failed to parse plasmid types: %w", err)
+		return err
 	}
 
 	err = graphql.NewClient(cmd.String("endpoint"), nil).
@@ -105,9 +90,14 @@ func listPlasmidsAction(ctx context.Context, cmd *cli.Command) error {
 	}
 	w.Flush()
 
+	if len(query.ListPlasmids.Plasmids) == 0 {
+		fmt.Fprintln(os.Stdout, "\nNo plasmids found.")
+		return nil
+	}
+
 	fmt.Fprintf(
 		os.Stdout,
-		"\nTotal: %d | Next cursor: %d\n",
+		"Total: %d | Next cursor: %d\n",
 		query.ListPlasmids.TotalCount,
 		query.ListPlasmids.NextCursor,
 	)
@@ -135,9 +125,9 @@ func main() {
 						Usage: "Number of plasmid entries to fetch",
 					},
 					&cli.StringFlag{
-						Name:  "types",
-						Value: defaultTypes,
-						Usage: "Comma-separated list of plasmid types to filter (ALL, REGULAR, GOLDEN_BRAID)",
+						Name:  "type",
+						Value: string(PlasmidTypeAll),
+						Usage: "Plasmid type to filter (ALL, REGULAR, GOLDEN_BRAID)",
 					},
 				},
 			},
