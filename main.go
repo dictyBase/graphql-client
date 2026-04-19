@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/hasura/go-graphql-client"
@@ -13,6 +14,7 @@ import (
 const (
 	tabPadding   = 3
 	defaultLimit = 10
+	defaultTypes = "ALL"
 )
 
 const (
@@ -31,6 +33,36 @@ type PlasmidListFilter struct {
 
 func (PlasmidListFilter) GetGraphQLType() string { return "PlasmidListFilter" }
 
+func parsePlasmidTypes(typesStr string) (PlasmidType, error) {
+	if typesStr == "" || typesStr == defaultTypes {
+		return PlasmidTypeAll, nil
+	}
+
+	typesList := strings.Split(typesStr, ",")
+	validTypes := make(map[PlasmidType]bool)
+	for _, t := range typesList {
+		t = strings.TrimSpace(t)
+		validTypes[PlasmidType(t)] = true
+	}
+
+	// Check if all specified types are valid
+	for t := range validTypes {
+		if t != PlasmidTypeAll && t != PlasmidTypeRegular && t != PlasmidTypeGoldenBraid {
+			return "", fmt.Errorf("invalid plasmid type: %s", t)
+		}
+	}
+
+	// If only one type is specified, use it
+	if len(validTypes) == 1 {
+		for t := range validTypes {
+			return t, nil
+		}
+	}
+
+	// Multiple valid types selected - use ALL as default
+	return PlasmidTypeAll, nil
+}
+
 type Plasmid struct {
 	ID      graphql.ID `graphql:"id"`
 	Name    string     `graphql:"name"`
@@ -48,12 +80,17 @@ type ListPlasmidsQuery struct {
 
 func listPlasmidsAction(ctx context.Context, cmd *cli.Command) error {
 	query := new(ListPlasmidsQuery)
-	err := graphql.NewClient(cmd.String("endpoint"), nil).
+	filterPlasmidType, err := parsePlasmidTypes(cmd.String("types"))
+	if err != nil {
+		return fmt.Errorf("failed to parse plasmid types: %w", err)
+	}
+
+	err = graphql.NewClient(cmd.String("endpoint"), nil).
 		Query(ctx, query, map[string]any{
 			"cursor": 0,
 			"limit":  cmd.Int("limit"),
 			"filter": PlasmidListFilter{
-				PlasmidType: PlasmidTypeAll,
+				PlasmidType: filterPlasmidType,
 			},
 		})
 	if err != nil {
@@ -96,6 +133,11 @@ func main() {
 						Name:  "limit",
 						Value: defaultLimit,
 						Usage: "Number of plasmid entries to fetch",
+					},
+					&cli.StringFlag{
+						Name:  "types",
+						Value: defaultTypes,
+						Usage: "Comma-separated list of plasmid types to filter (ALL, REGULAR, GOLDEN_BRAID)",
 					},
 				},
 			},
