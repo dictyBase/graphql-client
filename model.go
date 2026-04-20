@@ -18,14 +18,6 @@ var plasmidTypeMap = map[string]PlasmidType{
 	"GOLDEN_BRAID": PlasmidTypeGoldenBraid,
 }
 
-func parsePlasmidType(s string) (PlasmidType, error) {
-	pt, ok := plasmidTypeMap[s]
-	if !ok {
-		return "", errInvalidPlasmidType(PlasmidType(s))
-	}
-	return pt, nil
-}
-
 type PlasmidListFilter struct {
 	PlasmidType PlasmidType `json:"plasmid_type"`
 }
