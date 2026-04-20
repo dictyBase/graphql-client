@@ -7,10 +7,6 @@ import (
 	"github.com/hasura/go-graphql-client"
 )
 
-func newGraphQLClient(endpoint string) *graphql.Client {
-	return graphql.NewClient(endpoint, nil)
-}
-
 func fetchPlasmids(
 	ctx context.Context,
 	client *graphql.Client,

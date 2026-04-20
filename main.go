@@ -20,7 +20,7 @@ func main() {
 			{
 				Name:   "list-plasmids",
 				Usage:  "List plasmids from the GraphQL endpoint",
-				Action: runListPlasmidCLI,
+				Action: RunListPlasmidCLI,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "endpoint",
