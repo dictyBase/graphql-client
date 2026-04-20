@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	E "github.com/IBM/fp-go/v2/either"
 	F "github.com/IBM/fp-go/v2/function"
@@ -45,15 +46,20 @@ func mapListPlasmidFetchArgs(input listPlasmidValidatedArgs) listPlasmidFetchArg
 }
 
 func fetchListPlasmidsIO(input listPlasmidFetchArgs) IOE.IOEither[error, ListPlasmidsResult] {
-	return IOE.TryCatchError(func() (ListPlasmidsResult, error) {
-		return fetchPlasmids(
-			input.F1,
-			input.F2,
-			0,
-			input.F3,
-			input.F4,
-		)
-	})
+	return F.Pipe2(
+		IOE.TryCatchError(func() (*ListPlasmidsQuery, error) {
+			query := new(ListPlasmidsQuery)
+			return query, input.F2.Query(input.F1, query, map[string]any{
+				"cursor": 0,
+				"limit":  input.F3,
+				"filter": input.F4,
+			})
+		}),
+		IOE.MapLeft[*ListPlasmidsQuery](func(err error) error {
+			return fmt.Errorf("graphql query failed: %w", err)
+		}),
+		IOE.Map[error]((*ListPlasmidsQuery).toResult),
+	)
 }
 
 func toListPlasmidResultErrorTuple(err error) listPlasmidResultTuple {
