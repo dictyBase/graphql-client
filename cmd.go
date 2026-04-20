@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	E "github.com/IBM/fp-go/v2/either"
 	F "github.com/IBM/fp-go/v2/function"
@@ -71,7 +72,8 @@ func RunListPlasmidCLI(ctx context.Context, cmd *cli.Command) error {
 		E.Fold(
 			func(err error) error { return err },
 			func(result ListPlasmidsResult) error {
-				displayResults(result)
+				writePlasmidTable(os.Stdout, result.Plasmids)
+				writeSummary(os.Stdout, result)
 				return nil
 			},
 		),

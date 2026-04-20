@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
 	"text/tabwriter"
 )
 
@@ -25,9 +24,4 @@ func writeSummary(w io.Writer, result ListPlasmidsResult) {
 		return
 	}
 	fmt.Fprintf(w, "\nTotal: %d | Next cursor: %d\n", result.TotalCount, result.NextCursor)
-}
-
-func displayResults(result ListPlasmidsResult) {
-	writePlasmidTable(os.Stdout, result.Plasmids)
-	writeSummary(os.Stdout, result)
 }
