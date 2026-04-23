@@ -39,6 +39,36 @@ func main() {
 					},
 				},
 			},
+			{
+				Name:   "list-filtered-plasmids",
+				Usage:  "List plasmids with attribute-level filtering from the GraphQL endpoint",
+				Action: RunListFilteredPlasmidCLI,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "endpoint",
+						Value: defaultEndpoint,
+						Usage: "GraphQL API endpoint URL",
+					},
+					&cli.IntFlag{
+						Name:  "limit",
+						Value: defaultLimit,
+						Usage: "Number of plasmid entries to fetch",
+					},
+					&cli.StringFlag{
+						Name:  "type",
+						Value: string(PlasmidTypeAll),
+						Usage: "Plasmid type to filter (ALL, REGULAR, GOLDEN_BRAID)",
+					},
+					&cli.StringFlag{
+						Name:  "name",
+						Usage: "Filter by plasmid name",
+					},
+					&cli.StringFlag{
+						Name:  "summary",
+						Usage: "Filter by plasmid summary",
+					},
+				},
+			},
 		},
 	}
 

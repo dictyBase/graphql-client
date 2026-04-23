@@ -24,6 +24,14 @@ type PlasmidListFilter struct {
 
 func (PlasmidListFilter) GetGraphQLType() string { return "PlasmidListFilter" }
 
+type PlasmidAttributeFilter struct {
+	PlasmidType PlasmidType `json:"plasmid_type"`
+	Name        *string     `json:"name,omitempty"`
+	Summary     *string     `json:"summary,omitempty"`
+}
+
+func (PlasmidAttributeFilter) GetGraphQLType() string { return "PlasmidListFilter" }
+
 type Plasmid struct {
 	ID      graphql.ID `graphql:"id"`
 	Name    string     `graphql:"name"`
@@ -46,6 +54,22 @@ type ListPlasmidsQuery struct {
 }
 
 func (q *ListPlasmidsQuery) toResult() ListPlasmidsResult {
+	return ListPlasmidsResult{
+		NextCursor: q.ListPlasmids.NextCursor,
+		TotalCount: q.ListPlasmids.TotalCount,
+		Plasmids:   q.ListPlasmids.Plasmids,
+	}
+}
+
+type ListFilteredPlasmidsQuery struct {
+	ListPlasmids struct {
+		NextCursor int64     `graphql:"nextCursor"`
+		TotalCount int       `graphql:"totalCount"`
+		Plasmids   []Plasmid `graphql:"plasmids"`
+	} `graphql:"listPlasmids(cursor: $cursor, limit: $limit, filter: $filter)"`
+}
+
+func (q *ListFilteredPlasmidsQuery) toResult() ListPlasmidsResult {
 	return ListPlasmidsResult{
 		NextCursor: q.ListPlasmids.NextCursor,
 		TotalCount: q.ListPlasmids.TotalCount,
