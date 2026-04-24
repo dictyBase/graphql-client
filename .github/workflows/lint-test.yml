@@ -1,0 +1,33 @@
+name: Lint and Test
+on:
+  push:
+    branches:
+      - develop
+jobs:
+  lint:
+    name: Lint
+    uses: dictyBase/workflows/.github/workflows/golang-lint.yaml@develop
+    with:
+      repository: ${{ github.repository }}
+      ref: ${{ github.sha }}
+      version: "v2.8.0-alpine"
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: set up golang
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.25
+      - name: check out code
+        uses: actions/checkout@v6
+      - name: unit test
+        run: go test -covermode=atomic -coverprofile=profile.cov -v ./...
+        env:
+          GOPROXY: https://proxy.golang.org
+      - name: upload coverage to codecov
+        uses: codecov/codecov-action@v6
+        with:
+          file: ./profile.cov
