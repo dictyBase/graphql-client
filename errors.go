@@ -8,3 +8,10 @@ func errInvalidPlasmidType(pt PlasmidType) error {
 		pt,
 	)
 }
+
+func errInvalidStrainType(st StrainType) error {
+	return fmt.Errorf(
+		"invalid strain type: %s, must be one of: ALL, REGULAR, GWDI, BACTERIAL",
+		st,
+	)
+}

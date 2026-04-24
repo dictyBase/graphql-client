@@ -61,6 +61,64 @@ func TestParsePlasmidTypeFP(t *testing.T) {
 	}
 }
 
+func TestParseStrainTypeFP(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    StrainType
+		wantErr bool
+	}{
+		{
+			name:  "ALL type",
+			input: "ALL",
+			want:  StrainTypeAll,
+		},
+		{
+			name:  "REGULAR type",
+			input: "REGULAR",
+			want:  StrainTypeRegular,
+		},
+		{
+			name:  "GWDI type",
+			input: "GWDI",
+			want:  StrainTypeGwdi,
+		},
+		{
+			name:  "BACTERIAL type",
+			input: "BACTERIAL",
+			want:  StrainTypeBacterial,
+		},
+		{
+			name:    "empty string is invalid",
+			input:   "",
+			wantErr: true,
+		},
+		{
+			name:    "invalid type",
+			input:   "INVALID",
+			wantErr: true,
+		},
+		{
+			name:    "lowercase is invalid",
+			input:   "all",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ParseStrainType(tt.input)
+			val, err := E.Unwrap(result)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, val)
+		})
+	}
+}
+
 func TestStringPtr(t *testing.T) {
 	t.Run("empty string returns nil", func(t *testing.T) {
 		result := stringPtr("")
@@ -114,6 +172,7 @@ func buildTestCommand(t *testing.T, flags map[string]string) *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "name"},
 			&cli.StringFlag{Name: "summary"},
+			&cli.StringFlag{Name: "label"},
 		},
 	}
 	for k, v := range flags {
@@ -122,7 +181,43 @@ func buildTestCommand(t *testing.T, flags map[string]string) *cli.Command {
 			cmd.Set("name", v)
 		case "summary":
 			cmd.Set("summary", v)
+		case "label":
+			cmd.Set("label", v)
 		}
 	}
 	return cmd
+}
+
+func TestBuildStrainAttributeFilter(t *testing.T) {
+	t.Run("only strain type, no attribute filters", func(t *testing.T) {
+		cmd := buildTestCommand(t, nil)
+		filter := buildStrainAttributeFilter(StrainTypeAll, cmd)
+		require.Equal(t, StrainTypeAll, filter.StrainType)
+		require.Nil(t, filter.Label)
+		require.Nil(t, filter.Summary)
+	})
+
+	t.Run("all attribute filters set", func(t *testing.T) {
+		cmd := buildTestCommand(t, map[string]string{
+			"label":   "DBS0352420",
+			"summary": "axenic strain",
+		})
+		filter := buildStrainAttributeFilter(StrainTypeRegular, cmd)
+		require.Equal(t, StrainTypeRegular, filter.StrainType)
+		require.NotNil(t, filter.Label)
+		require.Equal(t, "DBS0352420", *filter.Label)
+		require.NotNil(t, filter.Summary)
+		require.Equal(t, "axenic strain", *filter.Summary)
+	})
+
+	t.Run("partial attribute filters", func(t *testing.T) {
+		cmd := buildTestCommand(t, map[string]string{
+			"label": "DBS",
+		})
+		filter := buildStrainAttributeFilter(StrainTypeGwdi, cmd)
+		require.Equal(t, StrainTypeGwdi, filter.StrainType)
+		require.NotNil(t, filter.Label)
+		require.Equal(t, "DBS", *filter.Label)
+		require.Nil(t, filter.Summary)
+	})
 }
