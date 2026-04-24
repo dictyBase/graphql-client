@@ -2,11 +2,38 @@
 
 A CLI for querying plasmid and strain stock data from a dictyBase GraphQL endpoint.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Commands](#commands)
+  - [list-plasmids](#list-plasmids)
+  - [list-filtered-plasmids](#list-filtered-plasmids)
+  - [list-strains](#list-strains)
+  - [list-filtered-strains](#list-filtered-strains)
+- [Output](#output)
+- [Development](#development)
+- [Architecture](#architecture)
+
 ## Installation
 
+### Clone and build
+
+Requires [Go 1.25+](https://go.dev/dl/).
+
 ```bash
+git clone https://github.com/dictybase-docker/graphql-client.git
+cd graphql-client
 go build -o gql-stocks .
 ```
+
+### Install with `go install`
+
+```bash
+go install github.com/dictybase-docker/graphql-client@latest
+```
+
+This places the `graphql-client` binary in your `$GOPATH/bin`.
 
 ## Quick Start
 
