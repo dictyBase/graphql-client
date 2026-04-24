@@ -1,4 +1,4 @@
-module github.com/dictybase-docker/gql-stocks
+module github.com/dictybase-docker/graphql-client
 
 go 1.25.5
 

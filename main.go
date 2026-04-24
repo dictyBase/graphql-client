@@ -14,7 +14,7 @@ const defaultEndpoint = "https://graphql.dictybase.dev/graphql"
 
 func newRootCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "gql-stocks",
+		Name:  "graphql-client",
 		Usage: "CLI to query stock data from a GraphQL endpoint",
 		Commands: []*cli.Command{
 			newListPlasmidsCommand(),
