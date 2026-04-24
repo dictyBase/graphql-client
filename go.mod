@@ -1,4 +1,4 @@
-module github.com/dictybase-docker/gql-plasmid
+module github.com/dictybase-docker/gql-stocks
 
 go 1.25.5
 

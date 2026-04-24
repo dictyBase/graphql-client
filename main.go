@@ -14,8 +14,8 @@ const defaultEndpoint = "https://graphql.dictybase.dev/graphql"
 
 func main() {
 	cmd := &cli.Command{
-		Name:  "gql-plasmid",
-		Usage: "CLI to query plasmid data from a GraphQL endpoint",
+		Name:  "gql-stocks",
+		Usage: "CLI to query stock data from a GraphQL endpoint",
 		Commands: []*cli.Command{
 			{
 				Name:   "list-plasmids",
