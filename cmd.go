@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	R "github.com/IBM/fp-go/v2/record"
-
 	E "github.com/IBM/fp-go/v2/either"
 	F "github.com/IBM/fp-go/v2/function"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
@@ -107,13 +105,12 @@ func RunListPlasmidCLI(ctx context.Context, cmd *cli.Command) error {
 }
 
 func ParsePlasmidType(s string) E.Either[error, PlasmidType] {
-	return F.Pipe2(
-		plasmidTypeMap,
-		R.Lookup[PlasmidType](s),
-		E.FromOption[PlasmidType](func() error {
-			return errInvalidPlasmidType(PlasmidType(s))
-		}),
-	)
+	switch pt := PlasmidType(s); pt {
+	case PlasmidTypeAll, PlasmidTypeRegular, PlasmidTypeGoldenBraid:
+		return E.Right[error, PlasmidType](pt)
+	default:
+		return E.Left[PlasmidType, error](errInvalidPlasmidType(pt))
+	}
 }
 
 func stringPtr(s string) *string {
@@ -198,13 +195,12 @@ func RunListFilteredPlasmidCLI(ctx context.Context, cmd *cli.Command) error {
 }
 
 func ParseStrainType(s string) E.Either[error, StrainType] {
-	return F.Pipe2(
-		strainTypeMap,
-		R.Lookup[StrainType](s),
-		E.FromOption[StrainType](func() error {
-			return errInvalidStrainType(StrainType(s))
-		}),
-	)
+	switch st := StrainType(s); st {
+	case StrainTypeAll, StrainTypeRegular, StrainTypeGwdi, StrainTypeBacterial:
+		return E.Right[error](st)
+	default:
+		return E.Left[StrainType](errInvalidStrainType(st))
+	}
 }
 
 func toListStrainValidatedArgs(

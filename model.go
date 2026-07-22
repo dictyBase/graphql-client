@@ -12,12 +12,6 @@ const (
 	PlasmidTypeGoldenBraid PlasmidType = "GOLDEN_BRAID"
 )
 
-var plasmidTypeMap = map[string]PlasmidType{
-	string(PlasmidTypeAll):     PlasmidTypeAll,
-	string(PlasmidTypeRegular): PlasmidTypeRegular,
-	"GOLDEN_BRAID":             PlasmidTypeGoldenBraid,
-}
-
 type PlasmidListFilter struct {
 	PlasmidType PlasmidType `json:"plasmid_type"`
 }
@@ -87,13 +81,6 @@ const (
 	StrainTypeGwdi      StrainType = "GWDI"
 	StrainTypeBacterial StrainType = "BACTERIAL"
 )
-
-var strainTypeMap = map[string]StrainType{
-	string(StrainTypeAll):     StrainTypeAll,
-	string(StrainTypeRegular): StrainTypeRegular,
-	"GWDI":                    StrainTypeGwdi,
-	"BACTERIAL":               StrainTypeBacterial,
-}
 
 type StrainListFilter struct {
 	StrainType StrainType `json:"strain_type"`
