@@ -17,12 +17,12 @@ func TestParsePlasmidTypeFP(t *testing.T) {
 	}{
 		{
 			name:  "ALL type",
-			input: "ALL",
+			input: string(PlasmidTypeAll),
 			want:  PlasmidTypeAll,
 		},
 		{
 			name:  "REGULAR type",
-			input: "REGULAR",
+			input: string(PlasmidTypeRegular),
 			want:  PlasmidTypeRegular,
 		},
 		{
@@ -70,12 +70,12 @@ func TestParseStrainTypeFP(t *testing.T) {
 	}{
 		{
 			name:  "ALL type",
-			input: "ALL",
+			input: string(StrainTypeAll),
 			want:  StrainTypeAll,
 		},
 		{
 			name:  "REGULAR type",
-			input: "REGULAR",
+			input: string(StrainTypeRegular),
 			want:  StrainTypeRegular,
 		},
 		{
@@ -143,8 +143,8 @@ func TestBuildPlasmidAttributeFilter(t *testing.T) {
 
 	t.Run("all attribute filters set", func(t *testing.T) {
 		cmd := buildTestCommand(t, map[string]string{
-			"name":    "pDM123",
-			"summary": "expression vector",
+			flagName:    "pDM123",
+			flagSummary: "expression vector",
 		})
 		filter := buildPlasmidAttributeFilter(PlasmidTypeRegular, cmd)
 		require.Equal(t, PlasmidTypeRegular, filter.PlasmidType)
@@ -156,7 +156,7 @@ func TestBuildPlasmidAttributeFilter(t *testing.T) {
 
 	t.Run("partial attribute filters", func(t *testing.T) {
 		cmd := buildTestCommand(t, map[string]string{
-			"name": "pDM",
+			flagName: "pDM",
 		})
 		filter := buildPlasmidAttributeFilter(PlasmidTypeGoldenBraid, cmd)
 		require.Equal(t, PlasmidTypeGoldenBraid, filter.PlasmidType)
@@ -170,19 +170,19 @@ func buildTestCommand(t *testing.T, flags map[string]string) *cli.Command {
 	t.Helper()
 	cmd := &cli.Command{
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "name"},
-			&cli.StringFlag{Name: "summary"},
-			&cli.StringFlag{Name: "label"},
+			&cli.StringFlag{Name: flagName},
+			&cli.StringFlag{Name: flagSummary},
+			&cli.StringFlag{Name: flagLabel},
 		},
 	}
 	for k, v := range flags {
 		switch k {
-		case "name":
-			cmd.Set("name", v)
-		case "summary":
-			cmd.Set("summary", v)
-		case "label":
-			cmd.Set("label", v)
+		case flagName:
+			cmd.Set(flagName, v)
+		case flagSummary:
+			cmd.Set(flagSummary, v)
+		case flagLabel:
+			cmd.Set(flagLabel, v)
 		}
 	}
 	return cmd
@@ -199,8 +199,8 @@ func TestBuildStrainAttributeFilter(t *testing.T) {
 
 	t.Run("all attribute filters set", func(t *testing.T) {
 		cmd := buildTestCommand(t, map[string]string{
-			"label":   "DBS0352420",
-			"summary": "axenic strain",
+			flagLabel:   "DBS0352420",
+			flagSummary: "axenic strain",
 		})
 		filter := buildStrainAttributeFilter(StrainTypeRegular, cmd)
 		require.Equal(t, StrainTypeRegular, filter.StrainType)
@@ -212,7 +212,7 @@ func TestBuildStrainAttributeFilter(t *testing.T) {
 
 	t.Run("partial attribute filters", func(t *testing.T) {
 		cmd := buildTestCommand(t, map[string]string{
-			"label": "DBS",
+			flagLabel: "DBS",
 		})
 		filter := buildStrainAttributeFilter(StrainTypeGwdi, cmd)
 		require.Equal(t, StrainTypeGwdi, filter.StrainType)

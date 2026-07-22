@@ -12,6 +12,18 @@ const defaultLimit = 10
 
 const defaultEndpoint = "https://graphql.dictybase.dev/graphql"
 
+// CLI flag names
+const (
+	flagEndpoint = "endpoint"
+	flagLimit    = "limit"
+	flagType     = "type"
+	flagName     = "name"
+	flagSummary  = "summary"
+	flagLabel    = "label"
+)
+
+const usageEndpoint = "GraphQL API endpoint URL"
+
 func newRootCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "graphql-client",
@@ -32,17 +44,17 @@ func newListPlasmidsCommand() *cli.Command {
 		Action: RunListPlasmidCLI,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "endpoint",
+				Name:  flagEndpoint,
 				Value: defaultEndpoint,
-				Usage: "GraphQL API endpoint URL",
+				Usage: usageEndpoint,
 			},
 			&cli.IntFlag{
-				Name:  "limit",
+				Name:  flagLimit,
 				Value: defaultLimit,
 				Usage: "Number of plasmid entries to fetch",
 			},
 			&cli.StringFlag{
-				Name:  "type",
+				Name:  flagType,
 				Value: string(PlasmidTypeAll),
 				Usage: "Plasmid type to filter (ALL, REGULAR, GOLDEN_BRAID)",
 			},
@@ -57,26 +69,26 @@ func newListFilteredPlasmidsCommand() *cli.Command {
 		Action: RunListFilteredPlasmidCLI,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "endpoint",
+				Name:  flagEndpoint,
 				Value: defaultEndpoint,
-				Usage: "GraphQL API endpoint URL",
+				Usage: usageEndpoint,
 			},
 			&cli.IntFlag{
-				Name:  "limit",
+				Name:  flagLimit,
 				Value: defaultLimit,
 				Usage: "Number of plasmid entries to fetch",
 			},
 			&cli.StringFlag{
-				Name:  "type",
+				Name:  flagType,
 				Value: string(PlasmidTypeAll),
 				Usage: "Plasmid type to filter (ALL, REGULAR, GOLDEN_BRAID)",
 			},
 			&cli.StringFlag{
-				Name:  "name",
+				Name:  flagName,
 				Usage: "Filter by plasmid name",
 			},
 			&cli.StringFlag{
-				Name:  "summary",
+				Name:  flagSummary,
 				Usage: "Filter by plasmid summary",
 			},
 		},
@@ -90,17 +102,17 @@ func newListStrainsCommand() *cli.Command {
 		Action: RunListStrainCLI,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "endpoint",
+				Name:  flagEndpoint,
 				Value: defaultEndpoint,
-				Usage: "GraphQL API endpoint URL",
+				Usage: usageEndpoint,
 			},
 			&cli.IntFlag{
-				Name:  "limit",
+				Name:  flagLimit,
 				Value: defaultLimit,
 				Usage: "Number of strain entries to fetch",
 			},
 			&cli.StringFlag{
-				Name:  "type",
+				Name:  flagType,
 				Value: string(StrainTypeAll),
 				Usage: "Strain type to filter (ALL, REGULAR, GWDI, BACTERIAL)",
 			},
@@ -115,26 +127,26 @@ func newListFilteredStrainsCommand() *cli.Command {
 		Action: RunListFilteredStrainCLI,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "endpoint",
+				Name:  flagEndpoint,
 				Value: defaultEndpoint,
-				Usage: "GraphQL API endpoint URL",
+				Usage: usageEndpoint,
 			},
 			&cli.IntFlag{
-				Name:  "limit",
+				Name:  flagLimit,
 				Value: defaultLimit,
 				Usage: "Number of strain entries to fetch",
 			},
 			&cli.StringFlag{
-				Name:  "type",
+				Name:  flagType,
 				Value: string(StrainTypeAll),
 				Usage: "Strain type to filter (ALL, REGULAR, GWDI, BACTERIAL)",
 			},
 			&cli.StringFlag{
-				Name:  "label",
+				Name:  flagLabel,
 				Usage: "Filter by strain label",
 			},
 			&cli.StringFlag{
-				Name:  "summary",
+				Name:  flagSummary,
 				Usage: "Filter by strain summary",
 			},
 		},

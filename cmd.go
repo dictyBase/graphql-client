@@ -15,6 +15,14 @@ import (
 	T "github.com/IBM/fp-go/v2/tuple"
 	graphql "github.com/hasura/go-graphql-client"
 	"github.com/urfave/cli/v3"
+
+	ioeutils "github.com/dictyBase/fp-go-loom/ioeitherutils"
+)
+
+// GraphQL variable keys
+const (
+	gqlVarCursor = "cursor"
+	gqlVarFilter = "filter"
 )
 
 type (
@@ -45,7 +53,7 @@ func toListPlasmidValidatedArgs(
 	input listPlasmidCLIArgs,
 ) IOE.IOEither[error, listPlasmidValidatedArgs] {
 	return F.Pipe2(
-		ParsePlasmidType(input.F2.String("type")),
+		ParsePlasmidType(input.F2.String(flagType)),
 		IOE.FromEither[error, PlasmidType],
 		IOE.Map[error](func(plasmidType PlasmidType) listPlasmidValidatedArgs {
 			return T.MakeTuple3(input.F1, input.F2, plasmidType)
@@ -56,8 +64,8 @@ func toListPlasmidValidatedArgs(
 func mapListPlasmidFetchArgs(input listPlasmidValidatedArgs) listPlasmidFetchArgs {
 	return T.MakeTuple4(
 		input.F1,
-		graphql.NewClient(input.F2.String("endpoint"), nil),
-		input.F2.Int("limit"),
+		graphql.NewClient(input.F2.String(flagEndpoint), nil),
+		input.F2.Int(flagLimit),
 		PlasmidListFilter{PlasmidType: input.F3},
 	)
 }
@@ -67,9 +75,9 @@ func fetchListPlasmidsIO(input listPlasmidFetchArgs) IOE.IOEither[error, ListPla
 		IOE.TryCatchError(func() (*ListPlasmidsQuery, error) {
 			query := new(ListPlasmidsQuery)
 			return query, input.F2.Query(input.F1, query, map[string]any{
-				"cursor": 0,
-				"limit":  input.F3,
-				"filter": input.F4,
+				gqlVarCursor: 0,
+				flagLimit:    input.F3,
+				gqlVarFilter: input.F4,
 			})
 		}),
 		IOE.MapLeft[*ListPlasmidsQuery](func(err error) error {
@@ -79,10 +87,6 @@ func fetchListPlasmidsIO(input listPlasmidFetchArgs) IOE.IOEither[error, ListPla
 	)
 }
 
-func toEither[ERR, A any](ioe IOE.IOEither[ERR, A]) E.Either[ERR, A] {
-	return ioe()
-}
-
 func RunListPlasmidCLI(ctx context.Context, cmd *cli.Command) error {
 	return F.Pipe6(
 		T.MakeTuple2(ctx, cmd),
@@ -90,7 +94,7 @@ func RunListPlasmidCLI(ctx context.Context, cmd *cli.Command) error {
 		IOE.Chain(toListPlasmidValidatedArgs),
 		IOE.Map[error](mapListPlasmidFetchArgs),
 		IOE.Chain(fetchListPlasmidsIO),
-		toEither[error, ListPlasmidsResult],
+		ioeutils.ToEither[error, ListPlasmidsResult],
 		E.Fold(
 			func(err error) error { return err },
 			func(result ListPlasmidsResult) error {
@@ -129,8 +133,8 @@ func buildPlasmidAttributeFilter(
 ) PlasmidAttributeFilter {
 	return PlasmidAttributeFilter{
 		PlasmidType: plasmidType,
-		Name:        stringPtr(cmd.String("name")),
-		Summary:     stringPtr(cmd.String("summary")),
+		Name:        stringPtr(cmd.String(flagName)),
+		Summary:     stringPtr(cmd.String(flagSummary)),
 	}
 }
 
@@ -138,7 +142,7 @@ func toFilteredPlasmidValidatedArgs(
 	input filteredPlasmidCLIArgs,
 ) IOE.IOEither[error, filteredPlasmidValidatedArgs] {
 	return F.Pipe2(
-		ParsePlasmidType(input.F2.String("type")),
+		ParsePlasmidType(input.F2.String(flagType)),
 		IOE.FromEither[error, PlasmidType],
 		IOE.Map[error](func(plasmidType PlasmidType) filteredPlasmidValidatedArgs {
 			return T.MakeTuple3(input.F1, input.F2, plasmidType)
@@ -149,8 +153,8 @@ func toFilteredPlasmidValidatedArgs(
 func mapFilteredPlasmidFetchArgs(input filteredPlasmidValidatedArgs) filteredPlasmidFetchArgs {
 	return T.MakeTuple4(
 		input.F1,
-		graphql.NewClient(input.F2.String("endpoint"), nil),
-		input.F2.Int("limit"),
+		graphql.NewClient(input.F2.String(flagEndpoint), nil),
+		input.F2.Int(flagLimit),
 		buildPlasmidAttributeFilter(input.F3, input.F2),
 	)
 }
@@ -162,9 +166,9 @@ func fetchListFilteredPlasmidsIO(
 		IOE.TryCatchError(func() (*ListFilteredPlasmidsQuery, error) {
 			query := new(ListFilteredPlasmidsQuery)
 			return query, input.F2.Query(input.F1, query, map[string]any{
-				"cursor": 0,
-				"limit":  input.F3,
-				"filter": input.F4,
+				gqlVarCursor: 0,
+				flagLimit:    input.F3,
+				gqlVarFilter: input.F4,
 			})
 		}),
 		IOE.MapLeft[*ListFilteredPlasmidsQuery](func(err error) error {
@@ -181,7 +185,7 @@ func RunListFilteredPlasmidCLI(ctx context.Context, cmd *cli.Command) error {
 		IOE.Chain(toFilteredPlasmidValidatedArgs),
 		IOE.Map[error](mapFilteredPlasmidFetchArgs),
 		IOE.Chain(fetchListFilteredPlasmidsIO),
-		toEither[error, ListPlasmidsResult],
+		ioeutils.ToEither[error, ListPlasmidsResult],
 		E.Fold(
 			func(err error) error { return err },
 			func(result ListPlasmidsResult) error {
@@ -207,7 +211,7 @@ func toListStrainValidatedArgs(
 	input listStrainCLIArgs,
 ) IOE.IOEither[error, listStrainValidatedArgs] {
 	return F.Pipe2(
-		ParseStrainType(input.F2.String("type")),
+		ParseStrainType(input.F2.String(flagType)),
 		IOE.FromEither[error, StrainType],
 		IOE.Map[error](func(strainType StrainType) listStrainValidatedArgs {
 			return T.MakeTuple3(input.F1, input.F2, strainType)
@@ -218,8 +222,8 @@ func toListStrainValidatedArgs(
 func mapListStrainFetchArgs(input listStrainValidatedArgs) listStrainFetchArgs {
 	return T.MakeTuple4(
 		input.F1,
-		graphql.NewClient(input.F2.String("endpoint"), nil),
-		input.F2.Int("limit"),
+		graphql.NewClient(input.F2.String(flagEndpoint), nil),
+		input.F2.Int(flagLimit),
 		StrainListFilter{StrainType: input.F3},
 	)
 }
@@ -229,9 +233,9 @@ func fetchListStrainsIO(input listStrainFetchArgs) IOE.IOEither[error, ListStrai
 		IOE.TryCatchError(func() (*ListStrainsQuery, error) {
 			query := new(ListStrainsQuery)
 			return query, input.F2.Query(input.F1, query, map[string]any{
-				"cursor": 0,
-				"limit":  input.F3,
-				"filter": input.F4,
+				gqlVarCursor: 0,
+				flagLimit:    input.F3,
+				gqlVarFilter: input.F4,
 			})
 		}),
 		IOE.MapLeft[*ListStrainsQuery](func(err error) error {
@@ -248,7 +252,7 @@ func RunListStrainCLI(ctx context.Context, cmd *cli.Command) error {
 		IOE.Chain(toListStrainValidatedArgs),
 		IOE.Map[error](mapListStrainFetchArgs),
 		IOE.Chain(fetchListStrainsIO),
-		toEither[error, ListStrainsResult],
+		ioeutils.ToEither[error, ListStrainsResult],
 		E.Fold(
 			func(err error) error { return err },
 			func(result ListStrainsResult) error {
@@ -266,8 +270,8 @@ func buildStrainAttributeFilter(
 ) StrainAttributeFilter {
 	return StrainAttributeFilter{
 		StrainType: strainType,
-		Label:      stringPtr(cmd.String("label")),
-		Summary:    stringPtr(cmd.String("summary")),
+		Label:      stringPtr(cmd.String(flagLabel)),
+		Summary:    stringPtr(cmd.String(flagSummary)),
 	}
 }
 
@@ -275,7 +279,7 @@ func toFilteredStrainValidatedArgs(
 	input filteredStrainCLIArgs,
 ) IOE.IOEither[error, filteredStrainValidatedArgs] {
 	return F.Pipe2(
-		ParseStrainType(input.F2.String("type")),
+		ParseStrainType(input.F2.String(flagType)),
 		IOE.FromEither[error, StrainType],
 		IOE.Map[error](func(strainType StrainType) filteredStrainValidatedArgs {
 			return T.MakeTuple3(input.F1, input.F2, strainType)
@@ -286,8 +290,8 @@ func toFilteredStrainValidatedArgs(
 func mapFilteredStrainFetchArgs(input filteredStrainValidatedArgs) filteredStrainFetchArgs {
 	return T.MakeTuple4(
 		input.F1,
-		graphql.NewClient(input.F2.String("endpoint"), nil),
-		input.F2.Int("limit"),
+		graphql.NewClient(input.F2.String(flagEndpoint), nil),
+		input.F2.Int(flagLimit),
 		buildStrainAttributeFilter(input.F3, input.F2),
 	)
 }
@@ -299,9 +303,9 @@ func fetchListFilteredStrainsIO(
 		IOE.TryCatchError(func() (*ListFilteredStrainsQuery, error) {
 			query := new(ListFilteredStrainsQuery)
 			return query, input.F2.Query(input.F1, query, map[string]any{
-				"cursor": 0,
-				"limit":  input.F3,
-				"filter": input.F4,
+				gqlVarCursor: 0,
+				flagLimit:    input.F3,
+				gqlVarFilter: input.F4,
 			})
 		}),
 		IOE.MapLeft[*ListFilteredStrainsQuery](func(err error) error {
@@ -318,7 +322,7 @@ func RunListFilteredStrainCLI(ctx context.Context, cmd *cli.Command) error {
 		IOE.Chain(toFilteredStrainValidatedArgs),
 		IOE.Map[error](mapFilteredStrainFetchArgs),
 		IOE.Chain(fetchListFilteredStrainsIO),
-		toEither[error, ListStrainsResult],
+		ioeutils.ToEither[error, ListStrainsResult],
 		E.Fold(
 			func(err error) error { return err },
 			func(result ListStrainsResult) error {
