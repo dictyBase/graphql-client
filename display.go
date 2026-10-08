@@ -43,3 +43,7 @@ func writeStrainSummary(w io.Writer, result ListStrainsResult) {
 	}
 	fmt.Fprintf(w, "\nTotal: %d | Next cursor: %d\n", result.TotalCount, result.NextCursor)
 }
+
+func writeCreatedOrder(w io.Writer, id string) {
+	fmt.Fprintf(w, "Order created: %s\n", id)
+}
