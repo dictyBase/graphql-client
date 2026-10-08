@@ -140,3 +140,82 @@ func (q *ListFilteredStrainsQuery) toResult() ListStrainsResult {
 		Strains:    q.ListStrains.Strains,
 	}
 }
+
+type StatusEnum string
+
+func (StatusEnum) GetGraphQLType() string { return "StatusEnum" }
+
+const (
+	StatusInPreparation StatusEnum = "IN_PREPARATION"
+	StatusGrowing       StatusEnum = "GROWING"
+	StatusCancelled     StatusEnum = "CANCELLED"
+	StatusShipped       StatusEnum = "SHIPPED"
+)
+
+type UserInfoInput struct {
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	Organization  string `json:"organization"`
+	FirstAddress  string `json:"first_address"`
+	SecondAddress string `json:"second_address"`
+	City          string `json:"city"`
+	State         string `json:"state"`
+	Zipcode       string `json:"zipcode"`
+	Country       string `json:"country"`
+	Phone         string `json:"phone"`
+}
+
+func (UserInfoInput) GetGraphQLType() string { return "UserInfoInput" }
+
+type CreateOrderInput struct {
+	Courier          string         `json:"courier"`
+	CourierAccount   string         `json:"courier_account"`
+	Comments         string         `json:"comments"`
+	Payment          string         `json:"payment"`
+	PurchaseOrderNum string         `json:"purchase_order_num"`
+	Status           StatusEnum     `json:"status"`
+	Consumer         string         `json:"consumer"`
+	Payer            string         `json:"payer"`
+	Purchaser        string         `json:"purchaser"`
+	Items            []string       `json:"items"`
+	ConsumerInfo     *UserInfoInput `json:"consumer_info,omitempty"`
+	PayerInfo        *UserInfoInput `json:"payer_info,omitempty"`
+}
+
+func (CreateOrderInput) GetGraphQLType() string { return "CreateOrderInput" }
+
+type CreateOrderMutation struct {
+	CreateOrder struct {
+		ID graphql.ID `graphql:"id"`
+	} `graphql:"createOrder(input: $input)"`
+}
+
+// fakeConsumerInfo is the fake consumer profile attached to test orders.
+func fakeConsumerInfo() *UserInfoInput {
+	return &UserInfoInput{
+		FirstName:    "Test",
+		LastName:     "Consumer",
+		Organization: "Test Lab",
+		FirstAddress: "123 Test Street",
+		City:         "Testville",
+		State:        "TS",
+		Zipcode:      "00000",
+		Country:      "USA",
+		Phone:        "555-0100",
+	}
+}
+
+// fakePayerInfo is the fake payer profile attached to test orders.
+func fakePayerInfo() *UserInfoInput {
+	return &UserInfoInput{
+		FirstName:    "Test",
+		LastName:     "Payer",
+		Organization: "Test Lab",
+		FirstAddress: "123 Test Street",
+		City:         "Testville",
+		State:        "TS",
+		Zipcode:      "00000",
+		Country:      "USA",
+		Phone:        "555-0200",
+	}
+}

@@ -14,15 +14,40 @@ const defaultEndpoint = "https://graphql.dictybase.dev/graphql"
 
 // CLI flag names
 const (
-	flagEndpoint = "endpoint"
-	flagLimit    = "limit"
-	flagType     = "type"
-	flagName     = "name"
-	flagSummary  = "summary"
-	flagLabel    = "label"
+	flagEndpoint       = "endpoint"
+	flagLimit          = "limit"
+	flagType           = "type"
+	flagName           = "name"
+	flagSummary        = "summary"
+	flagLabel          = "label"
+	flagConsumer       = "consumer"
+	flagPayer          = "payer"
+	flagPurchaser      = "purchaser"
+	flagItems          = "items"
+	flagCourier        = "courier"
+	flagCourierAccount = "courier-account"
+	flagPayment        = "payment"
+	flagComments       = "comments"
+	flagPONum          = "purchase-order-num"
+	flagStatus         = "status"
 )
 
 const usageEndpoint = "GraphQL API endpoint URL"
+
+// Fake defaults for the create-order command; only consumer/payer emails
+// and stock item ids need real values.
+const (
+	defaultCourier      = "FedEx"
+	defaultCourierAcct  = "FAKE-ACCT-0001"
+	defaultPayment      = "credit_card"
+	defaultComments     = "automated CLI test order"
+	defaultPONum        = "PO-FAKE-0001"
+	defaultPurchaser    = "fake-purchaser@example.org"
+	usageConsumerEmail  = "Real consumer email address, receives the invoice"
+	usagePayerEmail     = "Real payer email address, rendered in the invoice"
+	usagePurchaserEmail = "Purchaser email address (unused in email)"
+	usageOrderItems     = "Real stock item ids (DBS/DBP accessions), repeat or comma-separate"
+)
 
 func newRootCommand() *cli.Command {
 	return &cli.Command{
@@ -33,6 +58,72 @@ func newRootCommand() *cli.Command {
 			newListFilteredPlasmidsCommand(),
 			newListStrainsCommand(),
 			newListFilteredStrainsCommand(),
+			newCreateOrderCommand(),
+		},
+	}
+}
+
+func newCreateOrderCommand() *cli.Command {
+	return &cli.Command{
+		Name:   "create-order",
+		Usage:  "Create a stock order through the GraphQL endpoint",
+		Action: RunCreateOrderCLI,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  flagEndpoint,
+				Value: defaultEndpoint,
+				Usage: usageEndpoint,
+			},
+			&cli.StringFlag{
+				Name:     flagConsumer,
+				Usage:    usageConsumerEmail,
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     flagPayer,
+				Usage:    usagePayerEmail,
+				Required: true,
+			},
+			&cli.StringSliceFlag{
+				Name:     flagItems,
+				Usage:    usageOrderItems,
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:  flagPurchaser,
+				Value: defaultPurchaser,
+				Usage: usagePurchaserEmail,
+			},
+			&cli.StringFlag{
+				Name:  flagCourier,
+				Value: defaultCourier,
+				Usage: "Courier name",
+			},
+			&cli.StringFlag{
+				Name:  flagCourierAccount,
+				Value: defaultCourierAcct,
+				Usage: "Courier account number",
+			},
+			&cli.StringFlag{
+				Name:  flagPayment,
+				Value: defaultPayment,
+				Usage: "Payment method",
+			},
+			&cli.StringFlag{
+				Name:  flagComments,
+				Value: defaultComments,
+				Usage: "Order comments",
+			},
+			&cli.StringFlag{
+				Name:  flagPONum,
+				Value: defaultPONum,
+				Usage: "Purchase order number",
+			},
+			&cli.StringFlag{
+				Name:  flagStatus,
+				Value: string(StatusInPreparation),
+				Usage: "Order status (IN_PREPARATION, GROWING, CANCELLED, SHIPPED)",
+			},
 		},
 	}
 }
