@@ -11,6 +11,7 @@ A CLI for querying plasmid and strain stock data from a dictyBase GraphQL endpoi
   - [list-filtered-plasmids](#list-filtered-plasmids)
   - [list-strains](#list-strains)
   - [list-filtered-strains](#list-filtered-strains)
+  - [create-order](#create-order)
 - [Output](#output)
 - [Development](#development)
 - [Architecture](#architecture)
@@ -49,6 +50,9 @@ This places the `graphql-client` binary in your `$GOPATH/bin`.
 
 # Filter strains by label
 ./gql-stocks list-filtered-strains --label DBS0352420
+
+# Create a stock order
+./gql-stocks create-order --consumer jane@example.org --payer jane@example.org --items DBS0352420
 ```
 
 ## Commands
@@ -117,6 +121,33 @@ List strains with attribute-level filtering (label, summary) in addition to type
 ./gql-stocks list-filtered-strains --type REGULAR --summary "axenic" --limit 20
 ```
 
+### `create-order`
+
+Send a stock order to the GraphQL endpoint. Only `--consumer`, `--payer`, and `--items` need real values. The other flags have defaults that you can keep.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--endpoint` | string | `https://graphql.dictybase.dev/graphql` | GraphQL API endpoint URL |
+| `--consumer` | string | — | Consumer email address, receives the invoice (required) |
+| `--payer` | string | — | Payer email address, shown in the invoice (required) |
+| `--items` | string | — | Stock item ids (DBS/DBP accessions). Repeat the flag or use commas (required) |
+| `--purchaser` | string | `fake-purchaser@example.org` | Purchaser email address |
+| `--courier` | string | `FedEx` | Courier name |
+| `--courier-account` | string | `FAKE-ACCT-0001` | Courier account number |
+| `--payment` | string | `credit_card` | Payment method |
+| `--comments` | string | `automated CLI test order` | Order comments |
+| `--purchase-order-num` | string | `PO-FAKE-0001` | Purchase order number |
+| `--status` | string | `IN_PREPARATION` | Order status: `IN_PREPARATION`, `GROWING`, `CANCELLED`, `SHIPPED` |
+
+```bash
+./gql-stocks create-order \
+  --consumer jane@example.org \
+  --payer jane@example.org \
+  --items DBS0352420 --items DBP1234
+```
+
+On success, the command prints the new order ID.
+
 ## Output
 
 Results are printed as a tab-aligned table followed by a summary line.
@@ -139,6 +170,12 @@ ID        LABEL         IN STOCK  SUMMARY
 DBS03524  DBS0352420    true      axenic strain
 
 Total: 87 | Next cursor: 10
+```
+
+**Orders:**
+
+```
+Order created: 17342e12-acd0-4f2a-9456-123e51c0
 ```
 
 ## Development
