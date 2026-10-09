@@ -2,13 +2,6 @@ package main
 
 import "github.com/hasura/go-graphql-client"
 
-// GraphQL variable keys
-const (
-	gqlVarCursor = "cursor"
-	gqlVarFilter = "filter"
-	gqlVarInput  = "input"
-)
-
 type PlasmidType string
 
 func (PlasmidType) GetGraphQLType() string { return "PlasmidType" }
