@@ -49,20 +49,6 @@ const (
 	usageOrderItems     = "Real stock item ids (DBS/DBP accessions), repeat or comma-separate"
 )
 
-func newRootCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "graphql-client",
-		Usage: "CLI to query stock data from a GraphQL endpoint",
-		Commands: []*cli.Command{
-			newListPlasmidsCommand(),
-			newListFilteredPlasmidsCommand(),
-			newListStrainsCommand(),
-			newListFilteredStrainsCommand(),
-			newCreateOrderCommand(),
-		},
-	}
-}
-
 func newCreateOrderCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "create-order",
@@ -245,7 +231,19 @@ func newListFilteredStrainsCommand() *cli.Command {
 }
 
 func main() {
-	if err := newRootCommand().Run(context.Background(), os.Args); err != nil {
+	app := &cli.Command{
+		Name:  "graphql-client",
+		Usage: "CLI to query stock data from a GraphQL endpoint",
+		Commands: []*cli.Command{
+			newListPlasmidsCommand(),
+			newListFilteredPlasmidsCommand(),
+			newListStrainsCommand(),
+			newListFilteredStrainsCommand(),
+			newCreateOrderCommand(),
+		},
+	}
+
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
