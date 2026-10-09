@@ -1,6 +1,10 @@
 package main
 
-import "github.com/hasura/go-graphql-client"
+import (
+	"context"
+
+	"github.com/hasura/go-graphql-client"
+)
 
 type PlasmidType string
 
@@ -188,6 +192,12 @@ type CreateOrderMutation struct {
 	CreateOrder struct {
 		ID graphql.ID `graphql:"id"`
 	} `graphql:"createOrder(input: $input)"`
+}
+
+type CreateOrderInfo struct {
+	Endpoint string
+	Ctx      context.Context
+	Input    CreateOrderInput
 }
 
 // fakeConsumerInfo is the fake consumer profile attached to test orders.

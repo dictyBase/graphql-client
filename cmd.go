@@ -377,6 +377,14 @@ func validateOrderEmails(args createOrderCLIArgs) E.Either[error, createOrderCLI
 	)
 }
 
+func validateOrderStatus(args createOrderCLIArgs) E.Either[error, createOrderCLIArgs] {
+	return F.Pipe2(
+		args.Command.String(flagStatus),
+		ParseStatus,
+		E.Map[error](func(StatusEnum) createOrderCLIArgs { return args }),
+	)
+}
+
 func validateOrderItems(args createOrderCLIArgs) E.Either[error, createOrderCLIArgs] {
 	return F.Pipe2(
 		args.Command.StringSlice(flagItems),
@@ -388,51 +396,46 @@ func validateOrderItems(args createOrderCLIArgs) E.Either[error, createOrderCLIA
 	)
 }
 
-func toCreateOrderInput(args createOrderCLIArgs) E.Either[error, CreateOrderInput] {
-	return F.Pipe2(
-		args.Command.String(flagStatus),
-		ParseStatus,
-		E.Map[error](func(status StatusEnum) CreateOrderInput {
-			cmd := args.Command
-			return CreateOrderInput{
-				Courier:          cmd.String(flagCourier),
-				CourierAccount:   cmd.String(flagCourierAccount),
-				Comments:         cmd.String(flagComments),
-				Payment:          cmd.String(flagPayment),
-				PurchaseOrderNum: cmd.String(flagPONum),
-				Status:           status,
-				Consumer:         cmd.String(flagConsumer),
-				Payer:            cmd.String(flagPayer),
-				Purchaser:        cmd.String(flagPurchaser),
-				Items:            cmd.StringSlice(flagItems),
-				ConsumerInfo:     fakeConsumerInfo(),
-				PayerInfo:        fakePayerInfo(),
-			}
-		}),
-	)
+func toCreateOrderInput(args createOrderCLIArgs) CreateOrderInfo {
+	cmd := args.Command
+	input := CreateOrderInput{
+		Courier:          cmd.String(flagCourier),
+		CourierAccount:   cmd.String(flagCourierAccount),
+		Comments:         cmd.String(flagComments),
+		Payment:          cmd.String(flagPayment),
+		PurchaseOrderNum: cmd.String(flagPONum),
+		Status:           StatusEnum(cmd.String(flagStatus)),
+		Consumer:         cmd.String(flagConsumer),
+		Payer:            cmd.String(flagPayer),
+		Purchaser:        cmd.String(flagPurchaser),
+		Items:            cmd.StringSlice(flagItems),
+		ConsumerInfo:     fakeConsumerInfo(),
+		PayerInfo:        fakePayerInfo(),
+	}
+	return CreateOrderInfo{
+		Endpoint: cmd.String(flagEndpoint),
+		Ctx:      args.Context,
+		Input:    input,
+	}
 }
 
 // mutateCreateOrder sends the createOrder mutation with the given input
 // through a client built from the command's endpoint flag.
-func mutateCreateOrder(
-	args createOrderCLIArgs,
-) func(CreateOrderInput) IOE.IOEither[error, string] {
-	return func(input CreateOrderInput) IOE.IOEither[error, string] {
-		return F.Pipe2(
-			IOE.TryCatchError(func() (*CreateOrderMutation, error) {
-				mutation := new(CreateOrderMutation)
-				vars := map[string]any{gqlVarInput: input}
-				client := graphql.NewClient(args.Command.String(flagEndpoint), nil)
-				return mutation, client.Mutate(args.Context, mutation, vars)
-			}),
-			IOE.MapLeft[*CreateOrderMutation](func(err error) error {
-				return fmt.Errorf("graphql mutation failed: %w", err)
-			}),
-			IOE.Map[error](func(mutation *CreateOrderMutation) string {
-				return string(mutation.CreateOrder.ID)
-			}),
-		)
-	}
+func mutateCreateOrder(info CreateOrderInfo) IOE.IOEither[error, string] {
+	return F.Pipe2(
+		IOE.TryCatchError(func() (*CreateOrderMutation, error) {
+			mutation := new(CreateOrderMutation)
+			vars := map[string]any{gqlVarInput: info.Input}
+			client := graphql.NewClient(info.Endpoint, nil)
+			return mutation, client.Mutate(info.Ctx, mutation, vars)
+		}),
+		IOE.MapLeft[*CreateOrderMutation](func(err error) error {
+			return fmt.Errorf("graphql mutation failed: %w", err)
+		}),
+		IOE.Map[error](func(mutation *CreateOrderMutation) string {
+			return string(mutation.CreateOrder.ID)
+		}),
+	)
 }
 
 // submitCreateOrder builds the order input from the command flags and runs
@@ -441,16 +444,17 @@ func submitCreateOrder(args createOrderCLIArgs) IOE.IOEither[error, string] {
 	return F.Pipe3(
 		args,
 		IOE.Of[error, createOrderCLIArgs],
-		IOE.ChainEitherK(toCreateOrderInput),
-		IOE.Chain(mutateCreateOrder(args)),
+		IOE.Map[error](toCreateOrderInput),
+		IOE.Chain(mutateCreateOrder),
 	)
 }
 
 func RunCreateOrderCLI(ctx context.Context, cmd *cli.Command) error {
-	return F.Pipe6(
+	return F.Pipe7(
 		createOrderCLIArgs{Context: ctx, Command: cmd},
 		IOE.Of[error, createOrderCLIArgs],
 		IOE.ChainEitherK(validateOrderEmails),
+		IOE.ChainEitherK(validateOrderStatus),
 		IOE.ChainEitherK(validateOrderItems),
 		IOE.Chain(submitCreateOrder),
 		ioeutils.ToEither[error, string],

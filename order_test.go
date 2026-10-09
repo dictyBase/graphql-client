@@ -96,21 +96,22 @@ func TestParseStatusFP(t *testing.T) {
 func TestToCreateOrderInput(t *testing.T) {
 	args := orderTestArgs(t)
 	cmd := args.Command
-	result := toCreateOrderInput(args)
-	val, err := E.Unwrap(result)
-	require.NoError(t, err)
-	require.Equal(t, cmd.String(flagConsumer), val.Consumer)
-	require.Equal(t, cmd.String(flagPayer), val.Payer)
-	require.Equal(t, cmd.String(flagPurchaser), val.Purchaser)
-	require.Equal(t, cmd.StringSlice(flagItems), val.Items)
-	require.Equal(t, cmd.String(flagCourier), val.Courier)
-	require.Equal(t, cmd.String(flagCourierAccount), val.CourierAccount)
-	require.Equal(t, cmd.String(flagPayment), val.Payment)
-	require.Equal(t, cmd.String(flagComments), val.Comments)
-	require.Equal(t, cmd.String(flagPONum), val.PurchaseOrderNum)
-	require.Equal(t, StatusInPreparation, val.Status)
-	require.NotNil(t, val.ConsumerInfo, "should attach fake consumer info")
-	require.NotNil(t, val.PayerInfo, "should attach fake payer info")
+	info := toCreateOrderInput(args)
+	require.Equal(t, cmd.String(flagEndpoint), info.Endpoint)
+	require.Equal(t, args.Context, info.Ctx)
+	input := info.Input
+	require.Equal(t, cmd.String(flagConsumer), input.Consumer)
+	require.Equal(t, cmd.String(flagPayer), input.Payer)
+	require.Equal(t, cmd.String(flagPurchaser), input.Purchaser)
+	require.Equal(t, cmd.StringSlice(flagItems), input.Items)
+	require.Equal(t, cmd.String(flagCourier), input.Courier)
+	require.Equal(t, cmd.String(flagCourierAccount), input.CourierAccount)
+	require.Equal(t, cmd.String(flagPayment), input.Payment)
+	require.Equal(t, cmd.String(flagComments), input.Comments)
+	require.Equal(t, cmd.String(flagPONum), input.PurchaseOrderNum)
+	require.Equal(t, StatusInPreparation, input.Status)
+	require.NotNil(t, input.ConsumerInfo, "should attach fake consumer info")
+	require.NotNil(t, input.PayerInfo, "should attach fake payer info")
 }
 
 func TestValidateEmail(t *testing.T) {
@@ -190,6 +191,23 @@ func TestValidateOrderEmails(t *testing.T) {
 	})
 }
 
+func TestValidateOrderStatus(t *testing.T) {
+	t.Run("invalid status fails", func(t *testing.T) {
+		args := orderTestArgs(t)
+		require.NoError(t, args.Command.Set(flagStatus, "LOST"))
+		_, err := E.Unwrap(validateOrderStatus(args))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "status")
+	})
+
+	t.Run("valid status passes through the state", func(t *testing.T) {
+		args := orderTestArgs(t)
+		result, err := E.Unwrap(validateOrderStatus(args))
+		require.NoError(t, err)
+		require.Equal(t, args, result)
+	})
+}
+
 func TestValidateOrderItems(t *testing.T) {
 	t.Run("empty item list fails", func(t *testing.T) {
 		args := createOrderCLIArgs{
@@ -210,10 +228,9 @@ func TestValidateOrderItems(t *testing.T) {
 	})
 }
 
-func TestToCreateOrderInputInvalidStatus(t *testing.T) {
+func TestToCreateOrderInputStatusCarriesFlagValue(t *testing.T) {
 	args := orderTestArgs(t)
-	require.NoError(t, args.Command.Set(flagStatus, "LOST"))
-	_, err := E.Unwrap(toCreateOrderInput(args))
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "status")
+	require.NoError(t, args.Command.Set(flagStatus, "GROWING"))
+	info := toCreateOrderInput(args)
+	require.Equal(t, StatusGrowing, info.Input.Status)
 }
