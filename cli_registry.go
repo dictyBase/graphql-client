@@ -1,71 +1,109 @@
 package main
 
 import (
+	"slices"
+
 	"github.com/urfave/cli/v3"
 )
+
+// endpointFlag returns the shared --endpoint flag definition.
+func endpointFlag() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:  flagEndpoint,
+		Value: defaultEndpoint,
+		Usage: usageEndpoint,
+	}
+}
+
+// limitFlag returns the --limit flag with a per-command usage string.
+func limitFlag(usage string) *cli.IntFlag {
+	return &cli.IntFlag{
+		Name:  flagLimit,
+		Value: defaultLimit,
+		Usage: usage,
+	}
+}
+
+// orderContactFlags returns the order party flags: who receives and pays
+// the invoice, plus the optional purchaser and the requested stock items.
+func orderContactFlags() []cli.Flag {
+	return []cli.Flag{
+		endpointFlag(),
+		&cli.StringFlag{
+			Name:     flagConsumer,
+			Usage:    usageConsumerEmail,
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     flagPayer,
+			Usage:    usagePayerEmail,
+			Required: true,
+		},
+		&cli.StringSliceFlag{
+			Name:     flagItems,
+			Usage:    usageOrderItems,
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:  flagPurchaser,
+			Value: defaultPurchaser,
+			Usage: usagePurchaserEmail,
+		},
+	}
+}
+
+// orderShipmentFlags returns the delivery flags of the create-order command.
+func orderShipmentFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:  flagCourier,
+			Value: defaultCourier,
+			Usage: "Courier name",
+		},
+		&cli.StringFlag{
+			Name:  flagCourierAccount,
+			Value: defaultCourierAcct,
+			Usage: "Courier account number",
+		},
+		&cli.StringFlag{
+			Name:  flagPayment,
+			Value: defaultPayment,
+			Usage: "Payment method",
+		},
+	}
+}
+
+// orderRecordFlags returns the bookkeeping flags of the create-order command.
+func orderRecordFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:  flagComments,
+			Value: defaultComments,
+			Usage: "Order comments",
+		},
+		&cli.StringFlag{
+			Name:  flagPONum,
+			Value: defaultPONum,
+			Usage: "Purchase order number",
+		},
+		&cli.StringFlag{
+			Name:  flagStatus,
+			Value: string(StatusInPreparation),
+			Usage: "Order status (IN_PREPARATION, GROWING, CANCELLED, SHIPPED)",
+		},
+	}
+}
 
 func newCreateOrderCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "create-order",
 		Usage:  "Create a stock order through the GraphQL endpoint",
 		Action: RunCreateOrderCLI,
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  flagEndpoint,
-				Value: defaultEndpoint,
-				Usage: usageEndpoint,
-			},
-			&cli.StringFlag{
-				Name:     flagConsumer,
-				Usage:    usageConsumerEmail,
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:     flagPayer,
-				Usage:    usagePayerEmail,
-				Required: true,
-			},
-			&cli.StringSliceFlag{
-				Name:     flagItems,
-				Usage:    usageOrderItems,
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:  flagPurchaser,
-				Value: defaultPurchaser,
-				Usage: usagePurchaserEmail,
-			},
-			&cli.StringFlag{
-				Name:  flagCourier,
-				Value: defaultCourier,
-				Usage: "Courier name",
-			},
-			&cli.StringFlag{
-				Name:  flagCourierAccount,
-				Value: defaultCourierAcct,
-				Usage: "Courier account number",
-			},
-			&cli.StringFlag{
-				Name:  flagPayment,
-				Value: defaultPayment,
-				Usage: "Payment method",
-			},
-			&cli.StringFlag{
-				Name:  flagComments,
-				Value: defaultComments,
-				Usage: "Order comments",
-			},
-			&cli.StringFlag{
-				Name:  flagPONum,
-				Value: defaultPONum,
-				Usage: "Purchase order number",
-			},
-			&cli.StringFlag{
-				Name:  flagStatus,
-				Value: string(StatusInPreparation),
-				Usage: "Order status (IN_PREPARATION, GROWING, CANCELLED, SHIPPED)",
-			},
-		},
+		Flags: slices.Concat(
+			orderContactFlags(),
+			orderShipmentFlags(),
+			orderRecordFlags(),
+		),
 	}
 }
 
@@ -75,16 +113,8 @@ func newListPlasmidsCommand() *cli.Command {
 		Usage:  "List plasmids from the GraphQL endpoint",
 		Action: RunListPlasmidCLI,
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  flagEndpoint,
-				Value: defaultEndpoint,
-				Usage: usageEndpoint,
-			},
-			&cli.IntFlag{
-				Name:  flagLimit,
-				Value: defaultLimit,
-				Usage: "Number of plasmid entries to fetch",
-			},
+			endpointFlag(),
+			limitFlag("Number of plasmid entries to fetch"),
 			&cli.StringFlag{
 				Name:  flagType,
 				Value: string(PlasmidTypeAll),
@@ -100,16 +130,8 @@ func newListFilteredPlasmidsCommand() *cli.Command {
 		Usage:  "List plasmids with attribute-level filtering from the GraphQL endpoint",
 		Action: RunListFilteredPlasmidCLI,
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  flagEndpoint,
-				Value: defaultEndpoint,
-				Usage: usageEndpoint,
-			},
-			&cli.IntFlag{
-				Name:  flagLimit,
-				Value: defaultLimit,
-				Usage: "Number of plasmid entries to fetch",
-			},
+			endpointFlag(),
+			limitFlag("Number of plasmid entries to fetch"),
 			&cli.StringFlag{
 				Name:  flagType,
 				Value: string(PlasmidTypeAll),
@@ -133,16 +155,8 @@ func newListStrainsCommand() *cli.Command {
 		Usage:  "List strains from the GraphQL endpoint",
 		Action: RunListStrainCLI,
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  flagEndpoint,
-				Value: defaultEndpoint,
-				Usage: usageEndpoint,
-			},
-			&cli.IntFlag{
-				Name:  flagLimit,
-				Value: defaultLimit,
-				Usage: "Number of strain entries to fetch",
-			},
+			endpointFlag(),
+			limitFlag("Number of strain entries to fetch"),
 			&cli.StringFlag{
 				Name:  flagType,
 				Value: string(StrainTypeAll),
@@ -158,16 +172,8 @@ func newListFilteredStrainsCommand() *cli.Command {
 		Usage:  "List strains with attribute-level filtering from the GraphQL endpoint",
 		Action: RunListFilteredStrainCLI,
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  flagEndpoint,
-				Value: defaultEndpoint,
-				Usage: usageEndpoint,
-			},
-			&cli.IntFlag{
-				Name:  flagLimit,
-				Value: defaultLimit,
-				Usage: "Number of strain entries to fetch",
-			},
+			endpointFlag(),
+			limitFlag("Number of strain entries to fetch"),
 			&cli.StringFlag{
 				Name:  flagType,
 				Value: string(StrainTypeAll),
