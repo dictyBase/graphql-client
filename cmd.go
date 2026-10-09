@@ -425,9 +425,12 @@ func mutateCreateOrder(info CreateOrderInfo) IOE.IOEither[error, string] {
 	return F.Pipe2(
 		IOE.TryCatchError(func() (*CreateOrderMutation, error) {
 			mutation := new(CreateOrderMutation)
-			vars := map[string]any{gqlVarInput: info.Input}
 			client := graphql.NewClient(info.Endpoint, nil)
-			return mutation, client.Mutate(info.Ctx, mutation, vars)
+			return mutation, client.Mutate(
+				info.Ctx,
+				mutation,
+				map[string]any{gqlVarInput: info.Input},
+			)
 		}),
 		IOE.MapLeft[*CreateOrderMutation](func(err error) error {
 			return fmt.Errorf("graphql mutation failed: %w", err)
