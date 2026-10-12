@@ -127,21 +127,160 @@ List strains with attribute-level filtering (label, summary) in addition to type
 
 ### `search-stocks`
 
-Full-text search across strains and plasmids, ranked by relevance score.
+Search strains and plasmids with one text query. The server searches many stock
+fields at the same time and sorts the results by relevance score. Use this
+command when you know a fragment of a name, a label, a gene, or a summary, but
+you do not know the stock accession.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--endpoint` | string | `https://graphql.dictybase.dev/graphql` | GraphQL API endpoint URL |
 | `--query` | string | — | Search query, at least 2 characters (required) |
-| `--limit` | int | `10` | Number of search results to fetch |
+| `--limit` | int | `10` | Number of search results to fetch. The server accepts `0` to `100` |
 | `--entity` | string | `ALL` | Stock entity to search: `ALL`, `STRAIN`, `PLASMID` |
 
 ```bash
 ./gql-stocks search-stocks --query pDM
 ./gql-stocks search-stocks --query axenic --entity STRAIN --limit 20
+./gql-stocks search-stocks --query GFP --entity PLASMID --limit 4
 ```
 
-Each row shows the matching stock with the field that matched (`STOCK_ID`, `GENES`, `LABEL`, `NAMES`, `SPECIES`, `SUMMARY`, and others), the display text, its stock status, and the relevance score.
+#### How the query matches
+
+The query is one string. The command does not accept per-field flags. The
+server applies the string to every searchable field and returns the best field
+per stock.
+
+- The query must have 2 characters or more. A shorter query fails before any
+  network call with `invalid stock search query: must be at least 2 characters`.
+- The match ignores letter case. `pDM`, `PDM`, and `pdm` return the same stocks.
+- A prefix match ranks first. `pDM` matches the plasmid name `pDM309` and also
+  the name `pdmpA::bsr`.
+- A fuzzy match ranks after every prefix match. The query `309` matches the
+  strain label `V30309` and the plasmid name `pDM309` with a much lower score.
+- The `FIELD` column reports the field that produced the match. Therefore one
+  query can return a `NAME` hit, a `LABEL` hit, and a `SUMMARY` hit together.
+
+The server schema defines 10 match fields. The table lists each value of the
+`StockSearchFieldEnum` type.
+
+| `FIELD` value | Meaning | Seen in live probes |
+|---------------|---------|---------------------|
+| `STOCK_ID` | Stock accession, such as `DBS0236853` | yes |
+| `LABEL` | Strain label, such as `rasC-/AX2` | yes |
+| `NAME` | Plasmid name, such as `pDM309` | yes |
+| `SUMMARY` | Free-text stock summary | yes |
+| `SPECIES` | Strain species, such as `Polysphondylium pallidum` | yes |
+| `GENES` | Associated gene name, such as `mhcA` | yes |
+| `NAMES` | Alternate strain names | not seen |
+| `PLASMID` | Plasmid reference of a strain | not seen |
+| `DBXREFS` | External database cross-references | not seen |
+| `DEPOSITOR` | Depositor of the stock | not seen |
+
+#### Entity filter
+
+The `--entity` flag restricts the search to one stock type. The CLI validates
+the value before the network call. An unknown value fails with
+`invalid stock entity type: SPECIES, must be one of: ALL, STRAIN, PLASMID`.
+
+| `--entity` | Result set | Use it when |
+|------------|------------|-------------|
+| `ALL` | Strains and plasmids in one ranked list | You do not know the stock type |
+| `STRAIN` | Strains only, with the `LABEL` column filled | You want cell lines |
+| `PLASMID` | Plasmids only, with an empty `LABEL` column | You want vectors |
+
+```bash
+# Both stock types, strongest matches first
+./gql-stocks search-stocks --query AX4 --limit 8
+
+# Strains only
+./gql-stocks search-stocks --query rasC --entity STRAIN --limit 5
+
+# Plasmids only
+./gql-stocks search-stocks --query pDM --entity PLASMID --limit 5
+```
+
+#### Read the output
+
+The command prints one row per match and a total line. The columns come from
+the `StockSearchResult` type of the API.
+
+| Column | Content |
+|--------|---------|
+| `ID` | Stock accession. `DBS` marks a strain and `DBP` marks a plasmid. Pass this value to `create-order --items` |
+| `ENTITY` | `STRAIN` or `PLASMID` |
+| `FIELD` | The field that matched the query |
+| `DISPLAY TEXT` | The text of the matched field |
+| `IN STOCK` | `true` when the stock center holds inventory for the stock |
+| `SCORE` | Relevance score with 4 decimals. A higher score ranks higher |
+| `LABEL` | Strain label. The column stays empty for plasmids |
+| `SUMMARY` | Stock summary. The text can repeat `DISPLAY TEXT` for a `SUMMARY` match |
+
+The score is relative, not a percentage. A prefix match returns the top score
+`1000.0000`. A fuzzy match returns a lower value, and the exact number depends
+on the field and the corpus. Compare scores inside one result set only.
+
+The `Total:` line reports the number of rows in the response, not the number of
+stocks in the database. The search API has no cursor. To see more matches,
+raise `--limit` up to `100`.
+
+Strain search, with a label prefix match for every row:
+
+```bash
+./gql-stocks search-stocks --query rasC --entity STRAIN --limit 5
+```
+
+```
+ID           ENTITY   FIELD   DISPLAY TEXT   IN STOCK   SCORE       LABEL         SUMMARY
+--           ------   -----   ------------   --------   -----       -----         -------
+DBS0236853   STRAIN   LABEL   rasC-/AX2      true       1000.0000   rasC-/AX2     rasC null in AX2
+DBS0236854   STRAIN   LABEL   rasC-/JH10     true       1000.0000   rasC-/JH10    rasC null in JH10
+DBS0236855   STRAIN   LABEL   rasC-/dmpA-    true       1000.0000   rasC-/dmpA-   rasC-/dmpA- double null mutant...
+DBS0236856   STRAIN   LABEL   rasC-/pikD1    true       1000.0000   rasC-/pikD1   REMI of rasC-, disrupting the pikD gene...
+DBS0236857   STRAIN   LABEL   rasC-/rasD-    false      1000.0000   rasC-/rasD-   rasC/rasD double null mutant
+
+Total: 5
+```
+
+Mixed search, with prefix matches first and summary matches after them:
+
+```bash
+./gql-stocks search-stocks --query AX4 --limit 6
+```
+
+```
+ID           ENTITY   FIELD     DISPLAY TEXT       IN STOCK   SCORE       LABEL             SUMMARY
+--           ------   -----     ------------       --------   -----       -----             -------
+DBS0237637   STRAIN   LABEL     AX4                true       1000.0000   AX4               Adam Kuspa lab strain; axenic...
+DBS0307938   STRAIN   LABEL     AX4/[tagB]:lacZ    true       1000.0000   AX4/[tagB]:lacZ   lacZ taggedneomycin resistant
+DBS0349730   STRAIN   LABEL     AX4/ura-           true       1000.0000   AX4/ura-          pyr56-null strain with Uracil auxotrophy...
+DBS0351471   STRAIN   LABEL     AX4                true       1000.0000   AX4               AX4 strain from the Thompson lab...
+DBS0236498   STRAIN   SUMMARY   lagD- in AX4       false      507.7521    lagD-             lagD- in AX4
+DBS0235916   STRAIN   SUMMARY   dnmA null in AX4   false      507.5391    dnmA-             dnmA null in AX4
+
+Total: 6
+```
+
+A query with no match prints the header and a message:
+
+```
+ID   ENTITY   FIELD   DISPLAY TEXT   IN STOCK   SCORE   LABEL   SUMMARY
+--   ------   -----   ------------   --------   -----   -----   -------
+
+No stocks found.
+```
+
+#### Errors
+
+| Condition | Message | Checked by |
+|-----------|---------|------------|
+| Query shorter than 2 characters | `invalid stock search query: must be at least 2 characters` | CLI, before the request |
+| Entity outside the enum | `invalid stock entity type: <value>, must be one of: ALL, STRAIN, PLASMID` | CLI, before the request |
+| `--limit` above `100` or below `0` | `graphql query failed: ... validation error: - data.attributes.limit: value must be greater than or equal to 0 and less than or equal to 100` | Server |
+
+The command exits with status 1 on an error and writes the message to standard
+error. A `--limit` of `0` is valid and the server then applies its own default
+of 50 results.
 
 ### `create-order`
 
