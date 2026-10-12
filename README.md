@@ -11,6 +11,7 @@ A CLI for querying plasmid and strain stock data from a dictyBase GraphQL endpoi
   - [list-filtered-plasmids](#list-filtered-plasmids)
   - [list-strains](#list-strains)
   - [list-filtered-strains](#list-filtered-strains)
+  - [search-stocks](#search-stocks)
   - [create-order](#create-order)
 - [Output](#output)
 - [Development](#development)
@@ -50,6 +51,9 @@ This places the `graphql-client` binary in your `$GOPATH/bin`.
 
 # Filter strains by label
 ./gql-stocks list-filtered-strains --label DBS0352420
+
+# Search stocks by a text query
+./gql-stocks search-stocks --query pDM
 
 # Create a stock order
 ./gql-stocks create-order --consumer jane@example.org --payer jane@example.org --items DBS0352420
@@ -121,6 +125,24 @@ List strains with attribute-level filtering (label, summary) in addition to type
 ./gql-stocks list-filtered-strains --type REGULAR --summary "axenic" --limit 20
 ```
 
+### `search-stocks`
+
+Full-text search across strains and plasmids, ranked by relevance score.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--endpoint` | string | `https://graphql.dictybase.dev/graphql` | GraphQL API endpoint URL |
+| `--query` | string | — | Search query, at least 2 characters (required) |
+| `--limit` | int | `10` | Number of search results to fetch |
+| `--entity` | string | `ALL` | Stock entity to search: `ALL`, `STRAIN`, `PLASMID` |
+
+```bash
+./gql-stocks search-stocks --query pDM
+./gql-stocks search-stocks --query axenic --entity STRAIN --limit 20
+```
+
+Each row shows the matching stock with the field that matched (`STOCK_ID`, `GENES`, `LABEL`, `NAMES`, `SPECIES`, `SUMMARY`, and others), the display text, its stock status, and the relevance score.
+
 ### `create-order`
 
 Send a stock order to the GraphQL endpoint. Only `--consumer`, `--payer`, and `--items` need real values. The other flags have defaults that you can keep.
@@ -170,6 +192,16 @@ ID        LABEL         IN STOCK  SUMMARY
 DBS03524  DBS0352420    true      axenic strain
 
 Total: 87 | Next cursor: 10
+```
+
+**Stock search:**
+
+```
+ID           ENTITY    FIELD   DISPLAY TEXT   IN STOCK   SCORE       LABEL   SUMMARY
+--           ------    -----   ------------   --------   -----       -----   -------
+DBP0000511   PLASMID   NAME    pdmpA::bsr     true       1000.0000           Remi rescued plasmid...
+
+Total: 5
 ```
 
 **Orders:**

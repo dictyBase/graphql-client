@@ -8,6 +8,10 @@ import (
 // errNoOrderItems reports an order without any stock item id.
 var errNoOrderItems = errors.New("at least one stock item id is required")
 
+// errStockQueryTooShort reports a stock search query below the server's
+// 2-character minimum.
+var errStockQueryTooShort = errors.New("invalid stock search query: must be at least 2 characters")
+
 func errInvalidEmail(field string) error {
 	return fmt.Errorf("invalid %s email: must be a valid address", field)
 }
@@ -23,6 +27,13 @@ func errInvalidStrainType(st StrainType) error {
 	return fmt.Errorf(
 		"invalid strain type: %s, must be one of: ALL, REGULAR, GWDI, BACTERIAL",
 		st,
+	)
+}
+
+func errInvalidStockEntityType(et StockEntityType) error {
+	return fmt.Errorf(
+		"invalid stock entity type: %s, must be one of: ALL, STRAIN, PLASMID",
+		et,
 	)
 }
 
