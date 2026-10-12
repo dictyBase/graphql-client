@@ -30,9 +30,13 @@ const (
 	flagComments       = "comments"
 	flagPONum          = "purchase-order-num"
 	flagStatus         = "status"
+	flagQuery          = "query"
+	flagEntity         = "entity"
 )
 
 const usageEndpoint = "GraphQL API endpoint URL"
+
+const usageStockQuery = "Search query (at least 2 characters)"
 
 // Fake defaults for the create-order command; only consumer/payer emails
 // and stock item ids need real values.
@@ -58,6 +62,7 @@ func main() {
 			newListFilteredPlasmidsCommand(),
 			newListStrainsCommand(),
 			newListFilteredStrainsCommand(),
+			newSearchStocksCommand(),
 			newCreateOrderCommand(),
 		},
 	}

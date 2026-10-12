@@ -145,6 +145,46 @@ func (q *ListFilteredStrainsQuery) toResult() ListStrainsResult {
 	}
 }
 
+type StockEntityType string
+
+func (StockEntityType) GetGraphQLType() string { return "StockEntityType" }
+
+const (
+	StockEntityAll     StockEntityType = "ALL"
+	StockEntityStrain  StockEntityType = "STRAIN"
+	StockEntityPlasmid StockEntityType = "PLASMID"
+)
+
+type StockSearchResult struct {
+	ID          graphql.ID      `graphql:"id"`
+	Entity      StockEntityType `graphql:"entity"`
+	Field       string          `graphql:"field"`
+	DisplayText string          `graphql:"display_text"`
+	InStock     bool            `graphql:"in_stock"`
+	Score       float64         `graphql:"score"`
+	StrainLabel string          `graphql:"strain_label"`
+	Summary     string          `graphql:"summary"`
+}
+
+type SearchStocksResult struct {
+	TotalCount int
+	Results    []StockSearchResult
+}
+
+type SearchStocksQuery struct {
+	SearchStocks struct {
+		TotalCount int                 `graphql:"totalCount"`
+		Results    []StockSearchResult `graphql:"results"`
+	} `graphql:"searchStocks(query: $query, limit: $limit, entity: $entity)"`
+}
+
+func (q *SearchStocksQuery) toResult() SearchStocksResult {
+	return SearchStocksResult{
+		TotalCount: q.SearchStocks.TotalCount,
+		Results:    q.SearchStocks.Results,
+	}
+}
+
 type StatusEnum string
 
 func (StatusEnum) GetGraphQLType() string { return "StatusEnum" }

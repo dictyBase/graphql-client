@@ -94,6 +94,28 @@ func orderRecordFlags() []cli.Flag {
 	}
 }
 
+func newSearchStocksCommand() *cli.Command {
+	return &cli.Command{
+		Name:   "search-stocks",
+		Usage:  "Search stocks (strains and plasmids) from the GraphQL endpoint",
+		Action: RunSearchStockCLI,
+		Flags: []cli.Flag{
+			endpointFlag(),
+			&cli.StringFlag{
+				Name:     flagQuery,
+				Usage:    usageStockQuery,
+				Required: true,
+			},
+			limitFlag("Number of search results to fetch"),
+			&cli.StringFlag{
+				Name:  flagEntity,
+				Value: string(StockEntityAll),
+				Usage: "Stock entity to search (ALL, STRAIN, PLASMID)",
+			},
+		},
+	}
+}
+
 func newCreateOrderCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "create-order",

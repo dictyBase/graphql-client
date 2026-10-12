@@ -16,6 +16,7 @@ import (
 
 	ioeutils "github.com/dictyBase/fp-go-loom/ioeitherutils"
 	predarrays "github.com/dictyBase/fp-go-loom/predicate/array"
+	predord "github.com/dictyBase/fp-go-loom/predicate/ord"
 	predstrings "github.com/dictyBase/fp-go-loom/predicate/strings"
 )
 
@@ -327,6 +328,114 @@ func RunListFilteredStrainCLI(ctx context.Context, cmd *cli.Command) error {
 			func(result ListStrainsResult) error {
 				writeStrainTable(os.Stdout, result.Strains)
 				writeStrainSummary(os.Stdout, result)
+				return nil
+			},
+		),
+	)
+}
+
+// searchStockCLIArgs is the single state type of the search-stocks
+// pipeline; it carries the request context and the CLI command through
+// every step.
+type searchStockCLIArgs struct {
+	Context context.Context
+	Command *cli.Command
+}
+
+// searchStockFetchArgs carries the resolved query inputs for the
+// searchStocks GraphQL call.
+type searchStockFetchArgs struct {
+	Ctx    context.Context
+	Client *graphql.Client
+	Query  string
+	Limit  int
+	Entity StockEntityType
+}
+
+// minStockQueryLen mirrors the server-side minimum query length of the
+// searchStocks operation.
+const minStockQueryLen = 2
+
+// validateStockQuery checks that the --query flag meets the server's
+// minimum query length and passes the state through unchanged.
+func validateStockQuery(args searchStockCLIArgs) E.Either[error, searchStockCLIArgs] {
+	return F.Pipe2(
+		args.Command.String(flagQuery),
+		E.FromPredicate(
+			predord.MinStrLen(minStockQueryLen),
+			func(string) error { return errStockQueryTooShort },
+		),
+		E.Map[error](func(string) searchStockCLIArgs { return args }),
+	)
+}
+
+// parseStockEntity validates the --entity flag of the search-stocks
+// command and passes the state through unchanged.
+func parseStockEntity(args searchStockCLIArgs) E.Either[error, searchStockCLIArgs] {
+	return F.Pipe2(
+		args.Command.String(flagEntity),
+		ParseStockEntityType,
+		E.Map[error](func(StockEntityType) searchStockCLIArgs { return args }),
+	)
+}
+
+// toSearchStockFetchArgs builds the GraphQL call inputs from the command
+// flags of the search-stocks command.
+func toSearchStockFetchArgs(args searchStockCLIArgs) searchStockFetchArgs {
+	endpoint := args.Command.String(flagEndpoint)
+	client := graphql.NewClient(endpoint, nil)
+	entity := StockEntityType(args.Command.String(flagEntity))
+	return searchStockFetchArgs{
+		Ctx:    args.Context,
+		Client: client,
+		Query:  args.Command.String(flagQuery),
+		Limit:  args.Command.Int(flagLimit),
+		Entity: entity,
+	}
+}
+
+// fetchSearchStocksIO sends the searchStocks query through a client
+// built from the command's endpoint flag.
+func fetchSearchStocksIO(input searchStockFetchArgs) IOE.IOEither[error, SearchStocksResult] {
+	return F.Pipe2(
+		IOE.TryCatchError(func() (*SearchStocksQuery, error) {
+			query := new(SearchStocksQuery)
+			return query, input.Client.Query(input.Ctx, query, map[string]any{
+				flagQuery:  input.Query,
+				flagLimit:  input.Limit,
+				flagEntity: input.Entity,
+			})
+		}),
+		IOE.MapLeft[*SearchStocksQuery](func(err error) error {
+			return fmt.Errorf("graphql query failed: %w", err)
+		}),
+		IOE.Map[error]((*SearchStocksQuery).toResult),
+	)
+}
+
+func ParseStockEntityType(s string) E.Either[error, StockEntityType] {
+	switch et := StockEntityType(s); et {
+	case StockEntityAll, StockEntityStrain, StockEntityPlasmid:
+		return E.Right[error](et)
+	default:
+		return E.Left[StockEntityType](errInvalidStockEntityType(et))
+	}
+}
+
+func RunSearchStockCLI(ctx context.Context, cmd *cli.Command) error {
+	return F.Pipe7(
+		searchStockCLIArgs{Context: ctx, Command: cmd},
+		IOE.Of[error, searchStockCLIArgs],
+		IOE.ChainEitherK(validateStockQuery),
+		IOE.ChainEitherK(parseStockEntity),
+		IOE.Map[error](toSearchStockFetchArgs),
+		IOE.Chain(fetchSearchStocksIO),
+		ioeutils.ToEither[error, SearchStocksResult],
+		E.Fold(
+			func(err error) error { return err },
+			func(result SearchStocksResult) error {
+				writeStockSearchTable(os.Stdout, result.Results)
+				writeStockSearchSummary(os.Stdout, result)
 				return nil
 			},
 		),
