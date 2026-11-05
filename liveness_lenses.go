@@ -359,4 +359,236 @@ var (
 			return t
 		},
 	)
+
+	// Lenses on PlasmidListFilter and PlasmidAttributeFilter.
+	plasmidFilterTypeLens = L.MakeLens(
+		func(f PlasmidListFilter) PlasmidType { return f.PlasmidType },
+		func(f PlasmidListFilter, v PlasmidType) PlasmidListFilter {
+			f.PlasmidType = v
+			return f
+		},
+	)
+	plasmidAttrTypeLens = L.MakeLens(
+		func(f PlasmidAttributeFilter) PlasmidType { return f.PlasmidType },
+		func(f PlasmidAttributeFilter, v PlasmidType) PlasmidAttributeFilter {
+			f.PlasmidType = v
+			return f
+		},
+	)
+	plasmidAttrNameLens = L.MakeLens(
+		func(f PlasmidAttributeFilter) *string { return f.Name },
+		func(f PlasmidAttributeFilter, v *string) PlasmidAttributeFilter {
+			f.Name = v
+			return f
+		},
+	)
+	plasmidAttrSummaryLens = L.MakeLens(
+		func(f PlasmidAttributeFilter) *string { return f.Summary },
+		func(f PlasmidAttributeFilter, v *string) PlasmidAttributeFilter {
+			f.Summary = v
+			return f
+		},
+	)
+
+	// Lenses on StrainListFilter and StrainAttributeFilter.
+	strainFilterTypeLens = L.MakeLens(
+		func(f StrainListFilter) StrainType { return f.StrainType },
+		func(f StrainListFilter, v StrainType) StrainListFilter {
+			f.StrainType = v
+			return f
+		},
+	)
+	strainAttrTypeLens = L.MakeLens(
+		func(f StrainAttributeFilter) StrainType { return f.StrainType },
+		func(f StrainAttributeFilter, v StrainType) StrainAttributeFilter {
+			f.StrainType = v
+			return f
+		},
+	)
+	strainAttrLabelLens = L.MakeLens(
+		func(f StrainAttributeFilter) *string { return f.Label },
+		func(f StrainAttributeFilter, v *string) StrainAttributeFilter {
+			f.Label = v
+			return f
+		},
+	)
+	strainAttrSummaryLens = L.MakeLens(
+		func(f StrainAttributeFilter) *string { return f.Summary },
+		func(f StrainAttributeFilter, v *string) StrainAttributeFilter {
+			f.Summary = v
+			return f
+		},
+	)
+
+	// Lenses on searchStockCLIArgs and searchStockFetchArgs.
+	searchCLICtxLens = L.MakeLens(
+		func(a searchStockCLIArgs) context.Context { return a.Context },
+		func(a searchStockCLIArgs, v context.Context) searchStockCLIArgs {
+			a.Context = v
+			return a
+		},
+	)
+	searchCLICmdLens = L.MakeLens(
+		func(a searchStockCLIArgs) *cli.Command { return a.Command },
+		func(a searchStockCLIArgs, v *cli.Command) searchStockCLIArgs {
+			a.Command = v
+			return a
+		},
+	)
+	searchFetchCtxLens = L.MakeLens(
+		func(a searchStockFetchArgs) context.Context { return a.Ctx },
+		func(a searchStockFetchArgs, v context.Context) searchStockFetchArgs {
+			a.Ctx = v
+			return a
+		},
+	)
+	searchFetchClientLens = L.MakeLens(
+		func(a searchStockFetchArgs) *graphql.Client { return a.Client },
+		func(a searchStockFetchArgs, v *graphql.Client) searchStockFetchArgs {
+			a.Client = v
+			return a
+		},
+	)
+	searchFetchQueryLens = L.MakeLens(
+		func(a searchStockFetchArgs) string { return a.Query },
+		func(a searchStockFetchArgs, v string) searchStockFetchArgs {
+			a.Query = v
+			return a
+		},
+	)
+	searchFetchLimitLens = L.MakeLens(
+		func(a searchStockFetchArgs) int { return a.Limit },
+		func(a searchStockFetchArgs, v int) searchStockFetchArgs {
+			a.Limit = v
+			return a
+		},
+	)
+	searchFetchEntityLens = L.MakeLens(
+		func(a searchStockFetchArgs) StockEntityType { return a.Entity },
+		func(a searchStockFetchArgs, v StockEntityType) searchStockFetchArgs {
+			a.Entity = v
+			return a
+		},
+	)
+
+	// Lenses on createOrderCLIArgs, CreateOrderInput, and CreateOrderInfo.
+	orderCLICtxLens = L.MakeLens(
+		func(a createOrderCLIArgs) context.Context { return a.Context },
+		func(a createOrderCLIArgs, v context.Context) createOrderCLIArgs {
+			a.Context = v
+			return a
+		},
+	)
+	orderCLICmdLens = L.MakeLens(
+		func(a createOrderCLIArgs) *cli.Command { return a.Command },
+		func(a createOrderCLIArgs, v *cli.Command) createOrderCLIArgs {
+			a.Command = v
+			return a
+		},
+	)
+	orderCourierLens = L.MakeLens(
+		func(i CreateOrderInput) string { return i.Courier },
+		func(i CreateOrderInput, v string) CreateOrderInput {
+			i.Courier = v
+			return i
+		},
+	)
+	orderCourierAcctLens = L.MakeLens(
+		func(i CreateOrderInput) string { return i.CourierAccount },
+		func(i CreateOrderInput, v string) CreateOrderInput {
+			i.CourierAccount = v
+			return i
+		},
+	)
+	orderCommentsLens = L.MakeLens(
+		func(i CreateOrderInput) string { return i.Comments },
+		func(i CreateOrderInput, v string) CreateOrderInput {
+			i.Comments = v
+			return i
+		},
+	)
+	orderPaymentLens = L.MakeLens(
+		func(i CreateOrderInput) string { return i.Payment },
+		func(i CreateOrderInput, v string) CreateOrderInput {
+			i.Payment = v
+			return i
+		},
+	)
+	orderPONumLens = L.MakeLens(
+		func(i CreateOrderInput) string { return i.PurchaseOrderNum },
+		func(i CreateOrderInput, v string) CreateOrderInput {
+			i.PurchaseOrderNum = v
+			return i
+		},
+	)
+	orderStatusLens = L.MakeLens(
+		func(i CreateOrderInput) StatusEnum { return i.Status },
+		func(i CreateOrderInput, v StatusEnum) CreateOrderInput {
+			i.Status = v
+			return i
+		},
+	)
+	orderConsumerLens = L.MakeLens(
+		func(i CreateOrderInput) string { return i.Consumer },
+		func(i CreateOrderInput, v string) CreateOrderInput {
+			i.Consumer = v
+			return i
+		},
+	)
+	orderPayerLens = L.MakeLens(
+		func(i CreateOrderInput) string { return i.Payer },
+		func(i CreateOrderInput, v string) CreateOrderInput {
+			i.Payer = v
+			return i
+		},
+	)
+	orderPurchaserLens = L.MakeLens(
+		func(i CreateOrderInput) string { return i.Purchaser },
+		func(i CreateOrderInput, v string) CreateOrderInput {
+			i.Purchaser = v
+			return i
+		},
+	)
+	orderItemsLens = L.MakeLens(
+		func(i CreateOrderInput) []string { return i.Items },
+		func(i CreateOrderInput, v []string) CreateOrderInput {
+			i.Items = v
+			return i
+		},
+	)
+	orderConsumerInfoLens = L.MakeLens(
+		func(i CreateOrderInput) *UserInfoInput { return i.ConsumerInfo },
+		func(i CreateOrderInput, v *UserInfoInput) CreateOrderInput {
+			i.ConsumerInfo = v
+			return i
+		},
+	)
+	orderPayerInfoLens = L.MakeLens(
+		func(i CreateOrderInput) *UserInfoInput { return i.PayerInfo },
+		func(i CreateOrderInput, v *UserInfoInput) CreateOrderInput {
+			i.PayerInfo = v
+			return i
+		},
+	)
+	orderInfoEndpointLens = L.MakeLens(
+		func(i CreateOrderInfo) string { return i.Endpoint },
+		func(i CreateOrderInfo, v string) CreateOrderInfo {
+			i.Endpoint = v
+			return i
+		},
+	)
+	orderInfoCtxLens = L.MakeLens(
+		func(i CreateOrderInfo) context.Context { return i.Ctx },
+		func(i CreateOrderInfo, v context.Context) CreateOrderInfo {
+			i.Ctx = v
+			return i
+		},
+	)
+	orderInfoInputLens = L.MakeLens(
+		func(i CreateOrderInfo) CreateOrderInput { return i.Input },
+		func(i CreateOrderInfo, v CreateOrderInput) CreateOrderInfo {
+			i.Input = v
+			return i
+		},
+	)
 )

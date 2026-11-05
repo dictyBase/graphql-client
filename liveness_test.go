@@ -276,4 +276,5 @@ func TestPipelineCheckLivenessEntrypoint(t *testing.T) {
 	pipelinecheck.RequireNoNonRawTryCatchCallback(t, cfg)
 	pipelinecheck.RequireNoIfErrInTryCatch(t, cfg)
 	pipelinecheck.RequireBareIf(t, cfg)
+	pipelinecheck.RequireNoPopulatedStruct(t, cfg)
 }
