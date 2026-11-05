@@ -6,6 +6,7 @@ import (
 )
 
 // endpointFlag returns the shared --endpoint flag definition.
+// fp-go:allow-struct-literal urfave/cli flag descriptor
 func endpointFlag() *cli.StringFlag {
 	return &cli.StringFlag{
 		Name:  flagEndpoint,
@@ -15,6 +16,7 @@ func endpointFlag() *cli.StringFlag {
 }
 
 // limitFlag returns the --limit flag with a per-command usage string.
+// fp-go:allow-struct-literal urfave/cli flag descriptor
 func limitFlag(usage string) *cli.IntFlag {
 	return &cli.IntFlag{
 		Name:  flagLimit,
@@ -25,6 +27,7 @@ func limitFlag(usage string) *cli.IntFlag {
 
 // orderContactFlags returns the order party flags: who receives and pays
 // the invoice, plus the optional purchaser and the requested stock items.
+// fp-go:allow-struct-literal urfave/cli flag descriptors
 func orderContactFlags() []cli.Flag {
 	return []cli.Flag{
 		endpointFlag(),
@@ -52,6 +55,7 @@ func orderContactFlags() []cli.Flag {
 }
 
 // orderShipmentFlags returns the delivery flags of the create-order command.
+// fp-go:allow-struct-literal urfave/cli flag descriptors
 func orderShipmentFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -73,6 +77,7 @@ func orderShipmentFlags() []cli.Flag {
 }
 
 // orderRecordFlags returns the bookkeeping flags of the create-order command.
+// fp-go:allow-struct-literal urfave/cli flag descriptors
 func orderRecordFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -93,6 +98,7 @@ func orderRecordFlags() []cli.Flag {
 	}
 }
 
+// fp-go:allow-struct-literal urfave/cli command and flag descriptors
 func newSearchStocksCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "search-stocks",
@@ -115,6 +121,7 @@ func newSearchStocksCommand() *cli.Command {
 	}
 }
 
+// fp-go:allow-struct-literal urfave/cli command descriptor
 func newCreateOrderCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "create-order",
@@ -128,6 +135,7 @@ func newCreateOrderCommand() *cli.Command {
 	}
 }
 
+// fp-go:allow-struct-literal urfave/cli command and flag descriptors
 func newLivenessCheckCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "liveness-check",
@@ -144,6 +152,7 @@ func newLivenessCheckCommand() *cli.Command {
 	}
 }
 
+// fp-go:allow-struct-literal urfave/cli command and flag descriptors
 func newListPlasmidsCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "list-plasmids",
@@ -161,6 +170,7 @@ func newListPlasmidsCommand() *cli.Command {
 	}
 }
 
+// fp-go:allow-struct-literal urfave/cli command and flag descriptors
 func newListFilteredPlasmidsCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "list-filtered-plasmids",
@@ -186,6 +196,7 @@ func newListFilteredPlasmidsCommand() *cli.Command {
 	}
 }
 
+// fp-go:allow-struct-literal urfave/cli command and flag descriptors
 func newListStrainsCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "list-strains",
@@ -203,6 +214,7 @@ func newListStrainsCommand() *cli.Command {
 	}
 }
 
+// fp-go:allow-struct-literal urfave/cli command and flag descriptors
 func newListFilteredStrainsCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "list-filtered-strains",

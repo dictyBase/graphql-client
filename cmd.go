@@ -68,7 +68,7 @@ func mapListPlasmidFetchArgs(input listPlasmidValidatedArgs) listPlasmidFetchArg
 		input.F1,
 		graphql.NewClient(input.F2.String(flagEndpoint), nil),
 		input.F2.Int(flagLimit),
-		PlasmidListFilter{PlasmidType: input.F3},
+		F.Pipe1(PlasmidListFilter{}, plasmidFilterTypeLens.Set(input.F3)),
 	)
 }
 
@@ -132,11 +132,12 @@ func buildPlasmidAttributeFilter(
 	plasmidType PlasmidType,
 	cmd *cli.Command,
 ) PlasmidAttributeFilter {
-	return PlasmidAttributeFilter{
-		PlasmidType: plasmidType,
-		Name:        stringPtr(cmd.String(flagName)),
-		Summary:     stringPtr(cmd.String(flagSummary)),
-	}
+	return F.Pipe3(
+		PlasmidAttributeFilter{},
+		plasmidAttrTypeLens.Set(plasmidType),
+		plasmidAttrNameLens.Set(stringPtr(cmd.String(flagName))),
+		plasmidAttrSummaryLens.Set(stringPtr(cmd.String(flagSummary))),
+	)
 }
 
 func toFilteredPlasmidValidatedArgs(
@@ -224,7 +225,7 @@ func mapListStrainFetchArgs(input listStrainValidatedArgs) listStrainFetchArgs {
 		input.F1,
 		graphql.NewClient(input.F2.String(flagEndpoint), nil),
 		input.F2.Int(flagLimit),
-		StrainListFilter{StrainType: input.F3},
+		F.Pipe1(StrainListFilter{}, strainFilterTypeLens.Set(input.F3)),
 	)
 }
 
@@ -268,11 +269,12 @@ func buildStrainAttributeFilter(
 	strainType StrainType,
 	cmd *cli.Command,
 ) StrainAttributeFilter {
-	return StrainAttributeFilter{
-		StrainType: strainType,
-		Label:      stringPtr(cmd.String(flagLabel)),
-		Summary:    stringPtr(cmd.String(flagSummary)),
-	}
+	return F.Pipe3(
+		StrainAttributeFilter{},
+		strainAttrTypeLens.Set(strainType),
+		strainAttrLabelLens.Set(stringPtr(cmd.String(flagLabel))),
+		strainAttrSummaryLens.Set(stringPtr(cmd.String(flagSummary))),
+	)
 }
 
 func toFilteredStrainValidatedArgs(
@@ -385,13 +387,14 @@ func toSearchStockFetchArgs(args searchStockCLIArgs) searchStockFetchArgs {
 	endpoint := args.Command.String(flagEndpoint)
 	client := graphql.NewClient(endpoint, nil)
 	entity := StockEntityType(args.Command.String(flagEntity))
-	return searchStockFetchArgs{
-		Ctx:    args.Context,
-		Client: client,
-		Query:  args.Command.String(flagQuery),
-		Limit:  args.Command.Int(flagLimit),
-		Entity: entity,
-	}
+	return F.Pipe5(
+		searchStockFetchArgs{},
+		searchFetchCtxLens.Set(args.Context),
+		searchFetchClientLens.Set(client),
+		searchFetchQueryLens.Set(args.Command.String(flagQuery)),
+		searchFetchLimitLens.Set(args.Command.Int(flagLimit)),
+		searchFetchEntityLens.Set(entity),
+	)
 }
 
 // fetchSearchStocksIO sends the searchStocks query through a client
@@ -423,8 +426,10 @@ func ParseStockEntityType(s string) E.Either[error, StockEntityType] {
 }
 
 func RunSearchStockCLI(ctx context.Context, cmd *cli.Command) error {
-	return F.Pipe7(
-		searchStockCLIArgs{Context: ctx, Command: cmd},
+	return F.Pipe9(
+		searchStockCLIArgs{},
+		searchCLICtxLens.Set(ctx),
+		searchCLICmdLens.Set(cmd),
 		IOE.Of[error, searchStockCLIArgs],
 		IOE.ChainEitherK(validateStockQuery),
 		IOE.ChainEitherK(parseStockEntity),
@@ -507,25 +512,27 @@ func validateOrderItems(args createOrderCLIArgs) E.Either[error, createOrderCLIA
 
 func toCreateOrderInput(args createOrderCLIArgs) CreateOrderInfo {
 	cmd := args.Command
-	input := CreateOrderInput{
-		Courier:          cmd.String(flagCourier),
-		CourierAccount:   cmd.String(flagCourierAccount),
-		Comments:         cmd.String(flagComments),
-		Payment:          cmd.String(flagPayment),
-		PurchaseOrderNum: cmd.String(flagPONum),
-		Status:           StatusEnum(cmd.String(flagStatus)),
-		Consumer:         cmd.String(flagConsumer),
-		Payer:            cmd.String(flagPayer),
-		Purchaser:        cmd.String(flagPurchaser),
-		Items:            cmd.StringSlice(flagItems),
-		ConsumerInfo:     fakeConsumerInfo(),
-		PayerInfo:        fakePayerInfo(),
-	}
-	return CreateOrderInfo{
-		Endpoint: cmd.String(flagEndpoint),
-		Ctx:      args.Context,
-		Input:    input,
-	}
+	input := F.Pipe12(
+		CreateOrderInput{},
+		orderCourierLens.Set(cmd.String(flagCourier)),
+		orderCourierAcctLens.Set(cmd.String(flagCourierAccount)),
+		orderCommentsLens.Set(cmd.String(flagComments)),
+		orderPaymentLens.Set(cmd.String(flagPayment)),
+		orderPONumLens.Set(cmd.String(flagPONum)),
+		orderStatusLens.Set(StatusEnum(cmd.String(flagStatus))),
+		orderConsumerLens.Set(cmd.String(flagConsumer)),
+		orderPayerLens.Set(cmd.String(flagPayer)),
+		orderPurchaserLens.Set(cmd.String(flagPurchaser)),
+		orderItemsLens.Set(cmd.StringSlice(flagItems)),
+		orderConsumerInfoLens.Set(fakeConsumerInfo()),
+		orderPayerInfoLens.Set(fakePayerInfo()),
+	)
+	return F.Pipe3(
+		CreateOrderInfo{},
+		orderInfoEndpointLens.Set(cmd.String(flagEndpoint)),
+		orderInfoCtxLens.Set(args.Context),
+		orderInfoInputLens.Set(input),
+	)
 }
 
 // mutateCreateOrder sends the createOrder mutation with the given input
@@ -562,8 +569,10 @@ func submitCreateOrder(args createOrderCLIArgs) IOE.IOEither[error, string] {
 }
 
 func RunCreateOrderCLI(ctx context.Context, cmd *cli.Command) error {
-	return F.Pipe7(
-		createOrderCLIArgs{Context: ctx, Command: cmd},
+	return F.Pipe9(
+		createOrderCLIArgs{},
+		orderCLICtxLens.Set(ctx),
+		orderCLICmdLens.Set(cmd),
 		IOE.Of[error, createOrderCLIArgs],
 		IOE.ChainEitherK(validateOrderEmails),
 		IOE.ChainEitherK(validateOrderStatus),
