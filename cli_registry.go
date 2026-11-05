@@ -139,7 +139,7 @@ func newCreateOrderCommand() *cli.Command {
 func newLivenessCheckCommand() *cli.Command {
 	return &cli.Command{
 		Name:   "liveness-check",
-		Usage:  "Run a liveness check on GraphQL API operations and print a Markdown report",
+		Usage:  "Run a liveness check on GraphQL API operations and write a Markdown report",
 		Action: RunLivenessCheckCLI,
 		Flags: []cli.Flag{
 			endpointFlag(),
@@ -147,6 +147,11 @@ func newLivenessCheckCommand() *cli.Command {
 				Name:  flagTimeout,
 				Value: defaultLivenessTimeout,
 				Usage: "Per-request timeout for each GraphQL liveness probe",
+			},
+			&cli.StringFlag{
+				Name:  flagOutput,
+				Value: defaultLivenessReportPath,
+				Usage: "Path of the Markdown report file to write",
 			},
 		},
 	}

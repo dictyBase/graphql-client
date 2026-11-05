@@ -33,6 +33,7 @@ const (
 	flagQuery          = "query"
 	flagEntity         = "entity"
 	flagTimeout        = "timeout"
+	flagOutput         = "output"
 )
 
 const usageEndpoint = "GraphQL API endpoint URL"
