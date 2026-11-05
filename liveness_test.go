@@ -49,12 +49,12 @@ func livenessTestArgs() livenessCLIArgs {
 	)
 }
 
-func TestDefaultLivenessProbesCoverAllTwelveAuditOperations(t *testing.T) {
+func TestDefaultLivenessProbesCoverAllImplementedAuditOperations(t *testing.T) {
 	specs := defaultLivenessOperationSpecs()
-	require.Len(t, specs, 12)
+	require.Len(t, specs, 9)
 
 	probes := defaultLivenessProbes()
-	require.Len(t, probes, 30)
+	require.Len(t, probes, 27)
 
 	seenOps := make(map[string]int)
 	for _, probe := range probes {
@@ -164,10 +164,10 @@ func TestEvaluateLivenessAndWriteMarkdown(t *testing.T) {
 			}
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
 
-			if payload.OperationName == opListPhenotypes {
+			if payload.OperationName == opContentBySlug {
 				_, _ = w.Write([]byte(`{
 					"data": null,
-					"errors": [{"message": "ListPhenotypes is not yet implemented"}]
+					"errors": [{"message": "slug frontpage-show not found"}]
 				}`))
 				return
 			}
@@ -188,16 +188,11 @@ func TestEvaluateLivenessAndWriteMarkdown(t *testing.T) {
 		stateClientLens.Set(graphql.NewClient(srv.URL, srv.Client())),
 		stateProbesLens.Set([]LivenessProbe{
 			newStrainListProbe("strain_type=ALL", StrainTypeAll),
-			newPhenotypeAutocompleteProbe(
-				opListPhenotypes,
-				"listPhenotypes",
-				gqlDocListPhenotypes,
-				sampleSearchGrowth,
-			),
+			newContentSlugProbe("frontpage-show"),
 		}),
 		stateSpecsLens.Set([]LivenessOperationSpec{
 			newOperationSpec(opStrainList, routeCatalogAndStrains),
-			newOperationSpec(opListPhenotypes, routeEditablePhenotype),
+			newOperationSpec(opContentBySlug, routeInfoAndCommunity),
 		}),
 		stateStartedAtLens.Set(time.Now()),
 	)
@@ -212,7 +207,7 @@ func TestEvaluateLivenessAndWriteMarkdown(t *testing.T) {
 	require.Len(t, report.Failures, 1)
 	require.Equal(
 		t,
-		"ListPhenotypes is not yet implemented",
+		"slug frontpage-show not found",
 		report.Failures[0].ErrorMsg,
 	)
 
@@ -224,10 +219,10 @@ func TestEvaluateLivenessAndWriteMarkdown(t *testing.T) {
 	require.Contains(t, mdOut, "## Operation Health")
 	require.Contains(t, mdOut, "`StrainList`")
 	require.Contains(t, mdOut, "**PASS**")
-	require.Contains(t, mdOut, "`ListPhenotypes`")
+	require.Contains(t, mdOut, "`ContentBySlug`")
 	require.Contains(t, mdOut, "**FAIL**")
 	require.Contains(t, mdOut, "## Failure Summary")
-	require.Contains(t, mdOut, "`ListPhenotypes is not yet implemented`")
+	require.Contains(t, mdOut, "`slug frontpage-show not found`")
 }
 
 func TestWriteLivenessMarkdownHealthyReport(t *testing.T) {
