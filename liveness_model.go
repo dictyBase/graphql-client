@@ -231,7 +231,8 @@ const (
       }
     }
     genes {
-      name\n    }
+      name
+    }
     in_stock
     systematic_name
     genotypes
