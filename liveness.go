@@ -69,15 +69,22 @@ var (
 		predbytes.HasPositiveLen,
 		errEmptyPayload,
 	)
-	filterNonNullJSON  = O.FromPredicate(isNonNullJSON)
-	mapRawJSONToString = O.Map(rawJSONToString)
-	isNonEmptyOutcomes = predarrays.IsNonEmpty[LivenessProbeOutcome]()
-	isFailedOutcome    = P.Not(outcomePassedLens.Get)
-	zeroDurationThunk  = F.Constant(zeroDurationValue)
-	traverseAllProbes  = IOE.TraverseArray(executeProbe)
-	armPassStatus      = MO.Const(isZeroCount, probeStatusPass)
-	armHealthyStatus   = MO.Const(isZeroCount, livenessStatusHealthy)
-	armDownStatus      = MO.Const(isZeroCount, livenessStatusDown)
+	extractNonNullRawJSON = F.Flow2(
+		O.Map(rawJSONToString),
+		O.Chain(O.FromPredicate(isNonNullJSON)),
+	)
+	isNonEmptyOutcomes  = predarrays.IsNonEmpty[LivenessProbeOutcome]()
+	isFailedOutcome     = P.Not(outcomePassedLens.Get)
+	countPassedOutcomes = F.Flow2(
+		A.Filter(outcomePassedLens.Get),
+		A.Size[LivenessProbeOutcome],
+	)
+	filterFailedOutcomes = A.Filter(isFailedOutcome)
+	zeroDurationThunk    = F.Constant(zeroDurationValue)
+	traverseAllProbes    = IOE.TraverseArray(executeProbe)
+	armPassStatus        = MO.Const(isZeroCount, probeStatusPass)
+	armHealthyStatus     = MO.Const(isZeroCount, livenessStatusHealthy)
+	armDownStatus        = MO.Const(isZeroCount, livenessStatusDown)
 )
 
 type livenessCLIArgs struct {
@@ -97,10 +104,11 @@ type livenessRunState struct {
 }
 
 type livenessProbeInput struct {
-	Ctx     context.Context
-	Timeout time.Duration
-	Client  *graphql.Client
-	Probe   LivenessProbe
+	Ctx       context.Context
+	Timeout   time.Duration
+	Client    *graphql.Client
+	Probe     LivenessProbe
+	StartedAt time.Time
 }
 
 func cliEndpoint(args livenessCLIArgs) string {
@@ -158,18 +166,15 @@ func unmarshalProbeObject(
 
 func validateProbePayload(
 	rootField string,
-) E.Kleisli[error, []byte, string] {
-	extractRoot := F.Flow3(
-		R.Lookup[json.RawMessage](rootField),
-		mapRawJSONToString,
-		O.Chain(filterNonNullJSON),
-	)
-	nullRootErr := F.Constant(errNullProbeRoot(rootField))
-	return F.Flow4(
+	raw []byte,
+) E.Either[error, string] {
+	return F.Pipe5(
+		raw,
 		checkNonEmptyPayload,
 		E.Chain(unmarshalProbeObject),
-		E.Map[error](extractRoot),
-		E.Chain(E.FromOption[string](nullRootErr)),
+		E.Map[error](R.Lookup[json.RawMessage](rootField)),
+		E.Map[error](extractNonNullRawJSON),
+		E.Chain(E.FromOption[string](F.Constant(errNullProbeRoot(rootField)))),
 	)
 }
 
@@ -184,9 +189,8 @@ func graphQLErrorMessage(item graphql.Error) string {
 }
 
 func extractFirstGraphQLError(errs graphql.Errors) O.Option[string] {
-	slice := []graphql.Error(errs)
 	return F.Pipe2(
-		slice,
+		[]graphql.Error(errs),
 		A.Head[graphql.Error],
 		O.Map(graphQLErrorMessage),
 	)
@@ -202,7 +206,7 @@ func conciseGraphQLError(err error) string {
 }
 
 func rawExecProbe(input livenessProbeInput) IOE.IOEither[error, string] {
-	validator := validateProbePayload(probeInputRootFieldLens.Get(input))
+	rootField := probeInputRootFieldLens.Get(input)
 	baseCtx := probeInputCtxLens.Get(input)
 	timeout := probeInputTimeoutLens.Get(input)
 	client := probeInputClientLens.Get(input)
@@ -222,58 +226,66 @@ func rawExecProbe(input livenessProbeInput) IOE.IOEither[error, string] {
 			)
 			return raw, err
 		}),
-		IOE.ChainEitherK(validator),
+		IOE.ChainEitherK(F.Bind1st(validateProbePayload, rootField)),
 	)
 }
 
-func failedOutcomeIO(
-	probe LivenessProbe,
-	started time.Time,
-) func(error) IO.IO[LivenessProbeOutcome] {
-	return func(err error) IO.IO[LivenessProbeOutcome] {
-		msg := conciseGraphQLError(err)
-		outcome := F.Pipe4(
-			LivenessProbeOutcome{},
-			outcomeProbeLens.Set(probe),
-			outcomePassedLens.Set(false),
-			outcomeLatencyLens.Set(time.Since(started)),
-			outcomeErrorMsgLens.Set(msg),
-		)
-		return IO.Of(outcome)
+func stampProbeStart(input livenessProbeInput) IO.IO[livenessProbeInput] {
+	return func() livenessProbeInput {
+		return F.Pipe1(input, probeInputStartedAtLens.Set(time.Now()))
 	}
 }
 
-func passedOutcomeIO(
-	probe LivenessProbe,
-	started time.Time,
-) func(string) IO.IO[LivenessProbeOutcome] {
-	return func(string) IO.IO[LivenessProbeOutcome] {
-		outcome := F.Pipe3(
-			LivenessProbeOutcome{},
-			outcomeProbeLens.Set(probe),
-			outcomePassedLens.Set(true),
-			outcomeLatencyLens.Set(time.Since(started)),
-		)
-		return IO.Of(outcome)
-	}
+func buildFailedOutcome(
+	input livenessProbeInput,
+	err error,
+) IO.IO[LivenessProbeOutcome] {
+	return F.Pipe5(
+		LivenessProbeOutcome{},
+		outcomeProbeLens.Set(probeInputProbeLens.Get(input)),
+		outcomePassedLens.Set(false),
+		outcomeLatencyLens.Set(time.Since(probeInputStartedAtLens.Get(input))),
+		outcomeErrorMsgLens.Set(conciseGraphQLError(err)),
+		IO.Of[LivenessProbeOutcome],
+	)
+}
+
+func buildPassedOutcome(
+	input livenessProbeInput,
+	_ string,
+) IO.IO[LivenessProbeOutcome] {
+	return F.Pipe4(
+		LivenessProbeOutcome{},
+		outcomeProbeLens.Set(probeInputProbeLens.Get(input)),
+		outcomePassedLens.Set(true),
+		outcomeLatencyLens.Set(time.Since(probeInputStartedAtLens.Get(input))),
+		IO.Of[LivenessProbeOutcome],
+	)
+}
+
+func runTimedProbe(
+	input livenessProbeInput,
+) IOE.IOEither[error, LivenessProbeOutcome] {
+	return F.Pipe3(
+		input,
+		rawExecProbe,
+		IOE.Fold(
+			F.Bind1st(buildFailedOutcome, input),
+			F.Bind1st(buildPassedOutcome, input),
+		),
+		IOE.FromIO[error, LivenessProbeOutcome],
+	)
 }
 
 func executeProbe(
 	input livenessProbeInput,
 ) IOE.IOEither[error, LivenessProbeOutcome] {
-	probe := probeInputProbeLens.Get(input)
-	return IOE.Defer(func() IOE.IOEither[error, LivenessProbeOutcome] {
-		started := time.Now()
-		return F.Pipe3(
-			input,
-			rawExecProbe,
-			IOE.Fold(
-				failedOutcomeIO(probe, started),
-				passedOutcomeIO(probe, started),
-			),
-			IOE.FromIO[error, LivenessProbeOutcome],
-		)
-	})
+	return F.Pipe3(
+		input,
+		stampProbeStart,
+		IOE.FromIO[error, livenessProbeInput],
+		IOE.Chain(runTimedProbe),
+	)
 }
 
 func sumProbeLatency(
@@ -311,21 +323,27 @@ func overallLivenessStatus(passed, failed int) string {
 	})
 }
 
+func matchOperationName(opName string) P.Predicate[LivenessProbeOutcome] {
+	return F.Pipe1(
+		predord.StrEq(opName),
+		P.ContraMap(outcomeOperationLens.Get),
+	)
+}
+
+func filterOutcomesByOp(
+	opName string,
+	outcomes []LivenessProbeOutcome,
+) []LivenessProbeOutcome {
+	return F.Pipe1(outcomes, A.Filter(matchOperationName(opName)))
+}
+
 func summarizeOperation(
 	outcomes []LivenessProbeOutcome,
 	spec LivenessOperationSpec,
 ) OperationHealth {
 	opName := specOperationLens.Get(spec)
-	matchOp := F.Pipe1(
-		predord.StrEq(opName),
-		P.ContraMap(outcomeOperationLens.Get),
-	)
-	opOutcomes := F.Pipe1(outcomes, A.Filter(matchOp))
-	passed := F.Pipe2(
-		opOutcomes,
-		A.Filter(outcomePassedLens.Get),
-		A.Size[LivenessProbeOutcome],
-	)
+	opOutcomes := filterOutcomesByOp(opName, outcomes)
+	passed := countPassedOutcomes(opOutcomes)
 	total := A.Size(opOutcomes)
 	failed := total - passed
 	return F.Pipe7(
@@ -342,18 +360,13 @@ func summarizeOperation(
 
 func buildLivenessReport(state livenessRunState) LivenessReport {
 	outcomes := stateOutcomesLens.Get(state)
-	passed := F.Pipe2(
-		outcomes,
-		A.Filter(outcomePassedLens.Get),
-		A.Size[LivenessProbeOutcome],
-	)
+	passed := countPassedOutcomes(outcomes)
 	total := A.Size(outcomes)
 	failed := total - passed
 	ops := F.Pipe1(
 		stateSpecsLens.Get(state),
 		A.Map(F.Bind1st(summarizeOperation, outcomes)),
 	)
-	failures := F.Pipe1(outcomes, A.Filter(isFailedOutcome))
 	return F.Pipe8(
 		LivenessReport{},
 		reportEndpointLens.Set(stateEndpointLens.Get(state)),
@@ -363,7 +376,7 @@ func buildLivenessReport(state livenessRunState) LivenessReport {
 		reportFailedLens.Set(failed),
 		reportDurationLens.Set(time.Since(stateStartedAtLens.Get(state))),
 		reportOperationsLens.Set(ops),
-		reportFailuresLens.Set(failures),
+		reportFailuresLens.Set(filterFailedOutcomes(outcomes)),
 	)
 }
 

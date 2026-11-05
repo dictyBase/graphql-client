@@ -234,6 +234,10 @@ type CreateOrderMutation struct {
 	} `graphql:"createOrder(input: $input)"`
 }
 
+func (m *CreateOrderMutation) toOrderID() string {
+	return string(m.CreateOrder.ID)
+}
+
 type CreateOrderInfo struct {
 	Endpoint string
 	Ctx      context.Context
