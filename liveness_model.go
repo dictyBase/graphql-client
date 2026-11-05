@@ -14,18 +14,15 @@ const (
 )
 
 const (
-	opStrainList                = "StrainList"
-	opPlasmidListFilter         = "PlasmidListFilter"
-	opSearchStocks              = "SearchStocks"
-	opListStockSuggestions      = "ListStockSuggestions"
-	opPublication               = "Publication"
-	opContentBySlug             = "ContentBySlug"
-	opStrain                    = "Strain"
-	opPlasmid                   = "Plasmid"
-	opListStrainsWithPhenotype  = "ListStrainsWithPhenotype"
-	opListPhenotypes            = "ListPhenotypes"
-	opListPhenotypeEnvironments = "ListPhenotypeEnvironments"
-	opListPhenotypeAssays       = "ListPhenotypeAssays"
+	opStrainList               = "StrainList"
+	opPlasmidListFilter        = "PlasmidListFilter"
+	opSearchStocks             = "SearchStocks"
+	opListStockSuggestions     = "ListStockSuggestions"
+	opPublication              = "Publication"
+	opContentBySlug            = "ContentBySlug"
+	opStrain                   = "Strain"
+	opPlasmid                  = "Plasmid"
+	opListStrainsWithPhenotype = "ListStrainsWithPhenotype"
 )
 
 const (
@@ -38,7 +35,6 @@ const (
 	routeStrainDetail       = "/strains/:id"
 	routePlasmidDetail      = "/plasmids/:id"
 	routePhenotypeList      = "/phenotypes/:name"
-	routeEditablePhenotype  = "Editable phenotype form"
 )
 
 const (
@@ -49,7 +45,6 @@ const (
 	probeStatusFail        = "FAIL"
 	rootFieldSearchStocks  = "searchStocks"
 	sampleQueryAct         = "act"
-	sampleSearchGrowth     = "growth"
 )
 
 const (
@@ -74,18 +69,6 @@ const (
       last_name
     }
   }
-}`
-
-	gqlDocListPhenotypeAssays = `query ListPhenotypeAssays($search: String!) {
-  listPhenotypeAssays(search: $search)
-}`
-
-	gqlDocListPhenotypeEnvironments = `query ListPhenotypeEnvironments($search: String!) {
-  listPhenotypeEnvironments(search: $search)
-}`
-
-	gqlDocListPhenotypes = `query ListPhenotypes($search: String!) {
-  listPhenotypes(search: $search)
 }`
 
 	gqlDocListStockSuggestions = `query ListStockSuggestions($query: String!, $limit: Int, $entity: StockEntityType) {
@@ -373,9 +356,6 @@ func defaultLivenessOperationSpecs() []LivenessOperationSpec {
 		newOperationSpec(opStrain, routeStrainDetail),
 		newOperationSpec(opPlasmid, routePlasmidDetail),
 		newOperationSpec(opListStrainsWithPhenotype, routePhenotypeList),
-		newOperationSpec(opListPhenotypes, routeEditablePhenotype),
-		newOperationSpec(opListPhenotypeEnvironments, routeEditablePhenotype),
-		newOperationSpec(opListPhenotypeAssays, routeEditablePhenotype),
 	}
 }
 
@@ -462,38 +442,7 @@ func phenotypeLivenessProbes() []LivenessProbe {
 		newPhenotypeStrainsProbe("wild type"),
 		newPhenotypeStrainsProbe("aberrant aggregation"),
 		newPhenotypeStrainsProbe("decreased growth rate"),
-		newPhenotypeAutocompleteProbe(
-			opListPhenotypes,
-			"listPhenotypes",
-			gqlDocListPhenotypes,
-			sampleSearchGrowth,
-		),
-		newPhenotypeAutocompleteProbe(
-			opListPhenotypeEnvironments,
-			"listPhenotypeEnvironments",
-			gqlDocListPhenotypeEnvironments,
-			"agar",
-		),
-		newPhenotypeAutocompleteProbe(
-			opListPhenotypeAssays,
-			"listPhenotypeAssays",
-			gqlDocListPhenotypeAssays,
-			sampleSearchGrowth,
-		),
 	}
-}
-
-func newPhenotypeAutocompleteProbe(
-	op, rootField, queryDoc, search string,
-) LivenessProbe {
-	return newLivenessProbe(
-		op,
-		routeEditablePhenotype,
-		rootField,
-		`search="`+search+`"`,
-		queryDoc,
-		map[string]any{"search": search},
-	)
 }
 
 func newStrainListProbe(label string, strainType StrainType) LivenessProbe {
