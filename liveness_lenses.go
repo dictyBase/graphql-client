@@ -285,6 +285,16 @@ var (
 			return s
 		},
 	)
+	stateOutcomesLens = L.MakeLens(
+		func(s livenessRunState) []LivenessProbeOutcome { return s.Outcomes },
+		func(
+			s livenessRunState,
+			v []LivenessProbeOutcome,
+		) livenessRunState {
+			s.Outcomes = v
+			return s
+		},
+	)
 
 	// Lenses on livenessProbeInput and composed lenses into LivenessProbe.
 	probeInputCtxLens = L.MakeLens(

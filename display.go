@@ -18,6 +18,13 @@ import (
 
 const tabPadding = 3
 
+var (
+	isNonEmptyFailures = predarrays.IsNonEmpty[LivenessProbeOutcome]()
+	defaultHealthyLine = F.Constant(
+		[]string{"All GraphQL liveness probes passed."},
+	)
+)
+
 func writePlasmidTable(w io.Writer, plasmids []Plasmid) {
 	tw := tabwriter.NewWriter(w, 0, 0, tabPadding, ' ', 0)
 	fmt.Fprintln(tw, "ID\tNAME\tIN STOCK\tSUMMARY")
@@ -169,11 +176,9 @@ func buildOperationHealthTable(ops []OperationHealth) markdown.TableSet {
 func buildFailureSummaryLines(failures []LivenessProbeOutcome) []string {
 	return F.Pipe2(
 		failures,
-		O.FromPredicate(predarrays.IsNonEmpty[LivenessProbeOutcome]()),
+		O.FromPredicate(isNonEmptyFailures),
 		O.Fold(
-			func() []string {
-				return []string{"All GraphQL liveness probes passed."}
-			},
+			defaultHealthyLine,
 			A.Map(formatFailureBullet),
 		),
 	)
