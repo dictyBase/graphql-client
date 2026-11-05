@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
+	"fmt"
 	"os"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	F "github.com/IBM/fp-go/v2/function"
 	IO "github.com/IBM/fp-go/v2/io"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
+	IOEF "github.com/IBM/fp-go/v2/ioeither/file"
 	J "github.com/IBM/fp-go/v2/json"
 	N "github.com/IBM/fp-go/v2/number"
 	O "github.com/IBM/fp-go/v2/option"
@@ -32,6 +34,12 @@ import (
 )
 
 const zeroDurationValue time.Duration = 0
+
+const (
+	defaultLivenessReportPath             = "liveness-report.md"
+	reportFilePerm            os.FileMode = 0o644
+	msgReportWritten                      = "Liveness report written to %s\n"
+)
 
 var (
 	isZeroCount   = F.Pipe1(0, EQ.Equals(predord.IntEq))
@@ -94,15 +102,16 @@ type livenessCLIArgs struct {
 }
 
 type livenessRunState struct {
-	Ctx       context.Context
-	Endpoint  string
-	Timeout   time.Duration
-	Client    *graphql.Client
-	Probes    []LivenessProbe
-	Specs     []LivenessOperationSpec
-	StartedAt time.Time
-	Outcomes  []LivenessProbeOutcome
-	Report    LivenessReport
+	Ctx        context.Context
+	Endpoint   string
+	Timeout    time.Duration
+	Client     *graphql.Client
+	Probes     []LivenessProbe
+	Specs      []LivenessOperationSpec
+	StartedAt  time.Time
+	Outcomes   []LivenessProbeOutcome
+	Report     LivenessReport
+	ReportPath string
 }
 
 type opHealthBuildState struct {
@@ -127,6 +136,10 @@ func cliTimeout(args livenessCLIArgs) time.Duration {
 	return cliArgsCmdLens.Get(args).Duration(flagTimeout)
 }
 
+func cliOutputPath(args livenessCLIArgs) string {
+	return cliArgsCmdLens.Get(args).String(flagOutput)
+}
+
 func defaultLivenessProbes() []LivenessProbe {
 	return A.ArrayConcatAll(
 		catalogLivenessProbes(),
@@ -147,12 +160,13 @@ func validateLivenessArgs(
 }
 
 func toLivenessRunState(args livenessCLIArgs) livenessRunState {
-	return F.Pipe7(
+	return F.Pipe8(
 		livenessRunState{},
 		stateCtxLens.Set(cliArgsCtxLens.Get(args)),
 		stateEndpointLens.Set(cliEndpoint(args)),
 		stateTimeoutLens.Set(cliTimeout(args)),
 		stateClientLens.Set(graphql.NewClient(cliEndpoint(args), nil)),
+		stateReportPathLens.Set(cliOutputPath(args)),
 		stateProbesLens.Set(defaultLivenessProbes()),
 		stateSpecsLens.Set(defaultLivenessOperationSpecs()),
 		stateStartedAtLens.Set(time.Now()),
@@ -512,8 +526,34 @@ func evaluateLivenessState(
 	)
 }
 
+func wrapReportWriteErr(err error) error {
+	return fmt.Errorf("write liveness report: %w", err)
+}
+
+func renderLivenessReport(report LivenessReport) E.Either[error, []byte] {
+	var buf bytes.Buffer
+	err := writeLivenessMarkdown(&buf, report)
+	return E.TryCatchError(buf.Bytes(), err)
+}
+
+func writeLivenessReport(state livenessRunState) IOE.IOEither[error, string] {
+	path := stateReportPathLens.Get(state)
+	return F.Pipe4(
+		IOE.Of[error](stateReportLens.Get(state)),
+		IOE.ChainEitherK(renderLivenessReport),
+		IOE.MapLeft[[]byte](wrapReportWriteErr),
+		IOE.Chain(IOEF.WriteFile(path, reportFilePerm)),
+		IOE.Map[error](F.Constant1[[]byte](path)),
+	)
+}
+
+func reportWrittenMessage(path string) error {
+	fmt.Printf(msgReportWritten, path)
+	return nil
+}
+
 func RunLivenessCheckCLI(ctx context.Context, cmd *cli.Command) error {
-	return F.Pipe10(
+	return F.Pipe11(
 		livenessCLIArgs{},
 		cliArgsCtxLens.Set(ctx),
 		cliArgsCmdLens.Set(cmd),
@@ -522,11 +562,12 @@ func RunLivenessCheckCLI(ctx context.Context, cmd *cli.Command) error {
 		IOE.ChainEitherK(checkLivenessTimeout),
 		IOE.Map[error](toLivenessRunState),
 		IOE.Bind(stateOutcomesLens.Set, runAllProbes),
-		IOE.Map[error](buildLivenessReport),
-		ioeutils.ToEither[error, LivenessReport],
+		IOE.Let[error](stateReportLens.Set, buildLivenessReport),
+		IOE.Chain(writeLivenessReport),
+		ioeutils.ToEither[error, string],
 		E.Fold(
 			F.Identity[error],
-			F.Bind1st(writeLivenessMarkdown, io.Writer(os.Stdout)),
+			reportWrittenMessage,
 		),
 	)
 }

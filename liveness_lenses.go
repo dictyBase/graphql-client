@@ -302,6 +302,13 @@ var (
 			return s
 		},
 	)
+	stateReportPathLens = L.MakeLens(
+		func(s livenessRunState) string { return s.ReportPath },
+		func(s livenessRunState, v string) livenessRunState {
+			s.ReportPath = v
+			return s
+		},
+	)
 	stateReportEndpointLens = F.Pipe1(
 		stateReportLens,
 		L.Compose[livenessRunState](reportEndpointLens),

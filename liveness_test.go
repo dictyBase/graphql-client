@@ -7,6 +7,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +32,10 @@ func livenessTestCommand() *cli.Command {
 			&cli.DurationFlag{
 				Name:  flagTimeout,
 				Value: 5 * time.Second,
+			},
+			&cli.StringFlag{
+				Name:  flagOutput,
+				Value: defaultLivenessReportPath,
 			},
 		},
 	}
@@ -251,6 +257,32 @@ func TestWriteLivenessMarkdownHealthyReport(t *testing.T) {
 	mdOut := buf.String()
 	require.Contains(t, mdOut, "**HEALTHY**")
 	require.Contains(t, mdOut, "- All GraphQL liveness probes passed.")
+}
+
+func TestWriteLivenessReportToFile(t *testing.T) {
+	report := F.Pipe7(
+		LivenessReport{},
+		reportEndpointLens.Set("https://graphql.unit.test/graphql"),
+		reportStatusLens.Set(livenessStatusHealthy),
+		reportTotalLens.Set(1),
+		reportPassedLens.Set(1),
+		reportFailedLens.Set(0),
+		reportDurationLens.Set(42*time.Millisecond),
+		reportOperationsLens.Set([]OperationHealth{}),
+	)
+	state := F.Pipe2(
+		livenessRunState{},
+		stateReportLens.Set(report),
+		stateReportPathLens.Set(filepath.Join(t.TempDir(), "report.md")),
+	)
+
+	path, err := E.Unwrap(writeLivenessReport(state)())
+	require.NoError(t, err)
+
+	raw, readErr := os.ReadFile(path)
+	require.NoError(t, readErr)
+	require.Contains(t, string(raw), "# GraphQL API Liveness Report")
+	require.Contains(t, string(raw), "**HEALTHY**")
 }
 
 func TestOverallLivenessStatus(t *testing.T) {
