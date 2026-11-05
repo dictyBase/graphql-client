@@ -12,6 +12,7 @@ import (
 	"time"
 
 	E "github.com/IBM/fp-go/v2/either"
+	F "github.com/IBM/fp-go/v2/function"
 	loomcheck "github.com/dictyBase/fp-go-loom/loomcheck"
 	pipelinecheck "github.com/dictyBase/fp-go-loom/pipelinecheck"
 	graphql "github.com/hasura/go-graphql-client"
@@ -35,10 +36,11 @@ func livenessTestCommand() *cli.Command {
 }
 
 func livenessTestArgs() livenessCLIArgs {
-	return livenessCLIArgs{
-		Context: context.Background(),
-		Command: livenessTestCommand(),
-	}
+	return F.Pipe2(
+		livenessCLIArgs{},
+		cliArgsCtxLens.Set(context.Background()),
+		cliArgsCmdLens.Set(livenessTestCommand()),
+	)
 }
 
 func TestDefaultLivenessProbesCoverAllTwelveAuditOperations(t *testing.T) {
@@ -172,12 +174,13 @@ func TestEvaluateLivenessAndWriteMarkdown(t *testing.T) {
 	)
 	defer srv.Close()
 
-	state := livenessRunState{
-		Ctx:      context.Background(),
-		Endpoint: srv.URL,
-		Timeout:  5 * time.Second,
-		Client:   graphql.NewClient(srv.URL, srv.Client()),
-		Probes: []LivenessProbe{
+	state := F.Pipe7(
+		livenessRunState{},
+		stateCtxLens.Set(context.Background()),
+		stateEndpointLens.Set(srv.URL),
+		stateTimeoutLens.Set(5*time.Second),
+		stateClientLens.Set(graphql.NewClient(srv.URL, srv.Client())),
+		stateProbesLens.Set([]LivenessProbe{
 			newStrainListProbe("strain_type=ALL", StrainTypeAll),
 			newPhenotypeAutocompleteProbe(
 				opListPhenotypes,
@@ -185,13 +188,13 @@ func TestEvaluateLivenessAndWriteMarkdown(t *testing.T) {
 				gqlDocListPhenotypes,
 				sampleSearchGrowth,
 			),
-		},
-		Specs: []LivenessOperationSpec{
-			{Operation: opStrainList, RouteArea: routeCatalogAndStrains},
-			{Operation: opListPhenotypes, RouteArea: routeEditablePhenotype},
-		},
-		StartedAt: time.Now(),
-	}
+		}),
+		stateSpecsLens.Set([]LivenessOperationSpec{
+			newOperationSpec(opStrainList, routeCatalogAndStrains),
+			newOperationSpec(opListPhenotypes, routeEditablePhenotype),
+		}),
+		stateStartedAtLens.Set(time.Now()),
+	)
 
 	report, err := E.Unwrap(evaluateLivenessState(state)())
 	require.NoError(t, err)
@@ -222,25 +225,26 @@ func TestEvaluateLivenessAndWriteMarkdown(t *testing.T) {
 }
 
 func TestWriteLivenessMarkdownHealthyReport(t *testing.T) {
-	report := LivenessReport{
-		Endpoint: "https://graphql.dictybase.dev/graphql",
-		Status:   livenessStatusHealthy,
-		Total:    1,
-		Passed:   1,
-		Failed:   0,
-		Duration: 42 * time.Millisecond,
-		Operations: []OperationHealth{
-			{
-				Operation: opPublication,
-				RouteArea: routeReferencePreview,
-				Total:     1,
-				Passed:    1,
-				Failed:    0,
-				Latency:   42 * time.Millisecond,
-				Status:    probeStatusPass,
-			},
-		},
-	}
+	opRow := F.Pipe7(
+		OperationHealth{},
+		opHealthOperationLens.Set(opPublication),
+		opHealthRouteAreaLens.Set(routeReferencePreview),
+		opHealthTotalLens.Set(1),
+		opHealthPassedLens.Set(1),
+		opHealthFailedLens.Set(0),
+		opHealthLatencyLens.Set(42*time.Millisecond),
+		opHealthStatusLens.Set(probeStatusPass),
+	)
+	report := F.Pipe7(
+		LivenessReport{},
+		reportEndpointLens.Set("https://graphql.dictybase.dev/graphql"),
+		reportStatusLens.Set(livenessStatusHealthy),
+		reportTotalLens.Set(1),
+		reportPassedLens.Set(1),
+		reportFailedLens.Set(0),
+		reportDurationLens.Set(42*time.Millisecond),
+		reportOperationsLens.Set([]OperationHealth{opRow}),
+	)
 
 	var buf bytes.Buffer
 	require.NoError(t, writeLivenessMarkdown(&buf, report))
