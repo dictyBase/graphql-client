@@ -295,6 +295,112 @@ var (
 			return s
 		},
 	)
+	stateReportLens = L.MakeLens(
+		func(s livenessRunState) LivenessReport { return s.Report },
+		func(s livenessRunState, v LivenessReport) livenessRunState {
+			s.Report = v
+			return s
+		},
+	)
+	stateReportEndpointLens = F.Pipe1(
+		stateReportLens,
+		L.Compose[livenessRunState](reportEndpointLens),
+	)
+	stateReportStatusLens = F.Pipe1(
+		stateReportLens,
+		L.Compose[livenessRunState](reportStatusLens),
+	)
+	stateReportTotalLens = F.Pipe1(
+		stateReportLens,
+		L.Compose[livenessRunState](reportTotalLens),
+	)
+	stateReportPassedLens = F.Pipe1(
+		stateReportLens,
+		L.Compose[livenessRunState](reportPassedLens),
+	)
+	stateReportFailedLens = F.Pipe1(
+		stateReportLens,
+		L.Compose[livenessRunState](reportFailedLens),
+	)
+	stateReportDurationLens = F.Pipe1(
+		stateReportLens,
+		L.Compose[livenessRunState](reportDurationLens),
+	)
+	stateReportOperationsLens = F.Pipe1(
+		stateReportLens,
+		L.Compose[livenessRunState](reportOperationsLens),
+	)
+	stateReportFailuresLens = F.Pipe1(
+		stateReportLens,
+		L.Compose[livenessRunState](reportFailuresLens),
+	)
+
+	// Lenses on opHealthBuildState and composed lenses into Spec and Health.
+	opBuildSpecLens = L.MakeLens(
+		func(s opHealthBuildState) LivenessOperationSpec { return s.spec },
+		func(
+			s opHealthBuildState,
+			v LivenessOperationSpec,
+		) opHealthBuildState {
+			s.spec = v
+			return s
+		},
+	)
+	opBuildOutcomesLens = L.MakeLens(
+		func(s opHealthBuildState) []LivenessProbeOutcome {
+			return s.outcomes
+		},
+		func(
+			s opHealthBuildState,
+			v []LivenessProbeOutcome,
+		) opHealthBuildState {
+			s.outcomes = v
+			return s
+		},
+	)
+	opBuildHealthLens = L.MakeLens(
+		func(s opHealthBuildState) OperationHealth { return s.health },
+		func(s opHealthBuildState, v OperationHealth) opHealthBuildState {
+			s.health = v
+			return s
+		},
+	)
+	opBuildSpecOpLens = F.Pipe1(
+		opBuildSpecLens,
+		L.Compose[opHealthBuildState](specOperationLens),
+	)
+	opBuildSpecRouteLens = F.Pipe1(
+		opBuildSpecLens,
+		L.Compose[opHealthBuildState](specRouteAreaLens),
+	)
+	opBuildOperationLens = F.Pipe1(
+		opBuildHealthLens,
+		L.Compose[opHealthBuildState](opHealthOperationLens),
+	)
+	opBuildRouteAreaLens = F.Pipe1(
+		opBuildHealthLens,
+		L.Compose[opHealthBuildState](opHealthRouteAreaLens),
+	)
+	opBuildTotalLens = F.Pipe1(
+		opBuildHealthLens,
+		L.Compose[opHealthBuildState](opHealthTotalLens),
+	)
+	opBuildPassedLens = F.Pipe1(
+		opBuildHealthLens,
+		L.Compose[opHealthBuildState](opHealthPassedLens),
+	)
+	opBuildFailedLens = F.Pipe1(
+		opBuildHealthLens,
+		L.Compose[opHealthBuildState](opHealthFailedLens),
+	)
+	opBuildLatencyLens = F.Pipe1(
+		opBuildHealthLens,
+		L.Compose[opHealthBuildState](opHealthLatencyLens),
+	)
+	opBuildStatusLens = F.Pipe1(
+		opBuildHealthLens,
+		L.Compose[opHealthBuildState](opHealthStatusLens),
+	)
 
 	// Lenses on livenessProbeInput and composed lenses into LivenessProbe.
 	probeInputCtxLens = L.MakeLens(

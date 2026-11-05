@@ -14,6 +14,7 @@ import (
 	F "github.com/IBM/fp-go/v2/function"
 	IO "github.com/IBM/fp-go/v2/io"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
+	J "github.com/IBM/fp-go/v2/json"
 	N "github.com/IBM/fp-go/v2/number"
 	O "github.com/IBM/fp-go/v2/option"
 	P "github.com/IBM/fp-go/v2/predicate"
@@ -101,6 +102,13 @@ type livenessRunState struct {
 	Specs     []LivenessOperationSpec
 	StartedAt time.Time
 	Outcomes  []LivenessProbeOutcome
+	Report    LivenessReport
+}
+
+type opHealthBuildState struct {
+	spec     LivenessOperationSpec
+	outcomes []LivenessProbeOutcome
+	health   OperationHealth
 }
 
 type livenessProbeInput struct {
@@ -139,13 +147,12 @@ func validateLivenessArgs(
 }
 
 func toLivenessRunState(args livenessCLIArgs) livenessRunState {
-	endpoint := cliEndpoint(args)
 	return F.Pipe7(
 		livenessRunState{},
 		stateCtxLens.Set(cliArgsCtxLens.Get(args)),
-		stateEndpointLens.Set(endpoint),
+		stateEndpointLens.Set(cliEndpoint(args)),
 		stateTimeoutLens.Set(cliTimeout(args)),
-		stateClientLens.Set(graphql.NewClient(endpoint, nil)),
+		stateClientLens.Set(graphql.NewClient(cliEndpoint(args), nil)),
 		stateProbesLens.Set(defaultLivenessProbes()),
 		stateSpecsLens.Set(defaultLivenessOperationSpecs()),
 		stateStartedAtLens.Set(time.Now()),
@@ -156,14 +163,6 @@ func rawJSONToString(raw json.RawMessage) string {
 	return string(raw)
 }
 
-func unmarshalProbeObject(
-	raw []byte,
-) E.Either[error, map[string]json.RawMessage] {
-	var fields map[string]json.RawMessage
-	err := json.Unmarshal(raw, &fields)
-	return E.TryCatchError(fields, err)
-}
-
 func validateProbePayload(
 	rootField string,
 	raw []byte,
@@ -171,7 +170,7 @@ func validateProbePayload(
 	return F.Pipe5(
 		raw,
 		checkNonEmptyPayload,
-		E.Chain(unmarshalProbeObject),
+		E.Chain(J.Unmarshal[map[string]json.RawMessage]),
 		E.Map[error](R.Lookup[json.RawMessage](rootField)),
 		E.Map[error](extractNonNullRawJSON),
 		E.Chain(E.FromOption[string](F.Constant(errNullProbeRoot(rootField)))),
@@ -330,53 +329,152 @@ func matchOperationName(opName string) P.Predicate[LivenessProbeOutcome] {
 	)
 }
 
-func filterOutcomesByOp(
-	opName string,
-	outcomes []LivenessProbeOutcome,
-) []LivenessProbeOutcome {
-	return F.Pipe1(outcomes, A.Filter(matchOperationName(opName)))
+func setOpBuildOperation(s opHealthBuildState) opHealthBuildState {
+	return F.Pipe1(s, opBuildOperationLens.Set(opBuildSpecOpLens.Get(s)))
+}
+
+func setOpBuildRouteArea(s opHealthBuildState) opHealthBuildState {
+	return F.Pipe1(s, opBuildRouteAreaLens.Set(opBuildSpecRouteLens.Get(s)))
+}
+
+func filterOpBuildOutcomes(s opHealthBuildState) opHealthBuildState {
+	return F.Pipe2(
+		opBuildOutcomesLens.Get(s),
+		A.Filter(matchOperationName(opBuildOperationLens.Get(s))),
+		F.Pipe1(s, F.Flip(opBuildOutcomesLens.Set)),
+	)
+}
+
+func setOpBuildTotal(s opHealthBuildState) opHealthBuildState {
+	return F.Pipe1(s, opBuildTotalLens.Set(A.Size(opBuildOutcomesLens.Get(s))))
+}
+
+func setOpBuildPassed(s opHealthBuildState) opHealthBuildState {
+	return F.Pipe1(
+		s,
+		opBuildPassedLens.Set(countPassedOutcomes(opBuildOutcomesLens.Get(s))),
+	)
+}
+
+func setOpBuildFailed(s opHealthBuildState) opHealthBuildState {
+	return F.Pipe1(
+		s,
+		opBuildFailedLens.Set(
+			opBuildTotalLens.Get(s)-opBuildPassedLens.Get(s),
+		),
+	)
+}
+
+func setOpBuildLatency(s opHealthBuildState) opHealthBuildState {
+	return F.Pipe1(
+		s,
+		opBuildLatencyLens.Set(
+			averageProbeLatency(opBuildOutcomesLens.Get(s)),
+		),
+	)
+}
+
+func setOpBuildStatus(s opHealthBuildState) opHealthBuildState {
+	return F.Pipe1(
+		s,
+		opBuildStatusLens.Set(operationStatus(opBuildFailedLens.Get(s))),
+	)
 }
 
 func summarizeOperation(
 	outcomes []LivenessProbeOutcome,
 	spec LivenessOperationSpec,
 ) OperationHealth {
-	opName := specOperationLens.Get(spec)
-	opOutcomes := filterOutcomesByOp(opName, outcomes)
-	passed := countPassedOutcomes(opOutcomes)
-	total := A.Size(opOutcomes)
-	failed := total - passed
-	return F.Pipe7(
-		OperationHealth{},
-		opHealthOperationLens.Set(opName),
-		opHealthRouteAreaLens.Set(specRouteAreaLens.Get(spec)),
-		opHealthTotalLens.Set(total),
-		opHealthPassedLens.Set(passed),
-		opHealthFailedLens.Set(failed),
-		opHealthLatencyLens.Set(averageProbeLatency(opOutcomes)),
-		opHealthStatusLens.Set(operationStatus(failed)),
+	return F.Pipe11(
+		opHealthBuildState{},
+		opBuildSpecLens.Set(spec),
+		opBuildOutcomesLens.Set(outcomes),
+		setOpBuildOperation,
+		setOpBuildRouteArea,
+		filterOpBuildOutcomes,
+		setOpBuildTotal,
+		setOpBuildPassed,
+		setOpBuildFailed,
+		setOpBuildLatency,
+		setOpBuildStatus,
+		opBuildHealthLens.Get,
+	)
+}
+
+func setReportEndpoint(s livenessRunState) livenessRunState {
+	return F.Pipe1(s, stateReportEndpointLens.Set(stateEndpointLens.Get(s)))
+}
+
+func setReportTotal(s livenessRunState) livenessRunState {
+	return F.Pipe1(
+		s,
+		stateReportTotalLens.Set(A.Size(stateOutcomesLens.Get(s))),
+	)
+}
+
+func setReportPassed(s livenessRunState) livenessRunState {
+	return F.Pipe1(
+		s,
+		stateReportPassedLens.Set(countPassedOutcomes(stateOutcomesLens.Get(s))),
+	)
+}
+
+func setReportFailed(s livenessRunState) livenessRunState {
+	return F.Pipe1(
+		s,
+		stateReportFailedLens.Set(
+			stateReportTotalLens.Get(s)-stateReportPassedLens.Get(s),
+		),
+	)
+}
+
+func setReportStatus(s livenessRunState) livenessRunState {
+	return F.Pipe1(
+		s,
+		stateReportStatusLens.Set(
+			overallLivenessStatus(
+				stateReportPassedLens.Get(s),
+				stateReportFailedLens.Get(s),
+			),
+		),
+	)
+}
+
+func setReportDuration(s livenessRunState) livenessRunState {
+	return F.Pipe1(
+		s,
+		stateReportDurationLens.Set(time.Since(stateStartedAtLens.Get(s))),
+	)
+}
+
+func setReportOperations(s livenessRunState) livenessRunState {
+	return F.Pipe2(
+		stateSpecsLens.Get(s),
+		A.Map(F.Bind1st(summarizeOperation, stateOutcomesLens.Get(s))),
+		F.Pipe1(s, F.Flip(stateReportOperationsLens.Set)),
+	)
+}
+
+func setReportFailures(s livenessRunState) livenessRunState {
+	return F.Pipe2(
+		stateOutcomesLens.Get(s),
+		filterFailedOutcomes,
+		F.Pipe1(s, F.Flip(stateReportFailuresLens.Set)),
 	)
 }
 
 func buildLivenessReport(state livenessRunState) LivenessReport {
-	outcomes := stateOutcomesLens.Get(state)
-	passed := countPassedOutcomes(outcomes)
-	total := A.Size(outcomes)
-	failed := total - passed
-	ops := F.Pipe1(
-		stateSpecsLens.Get(state),
-		A.Map(F.Bind1st(summarizeOperation, outcomes)),
-	)
-	return F.Pipe8(
-		LivenessReport{},
-		reportEndpointLens.Set(stateEndpointLens.Get(state)),
-		reportStatusLens.Set(overallLivenessStatus(passed, failed)),
-		reportTotalLens.Set(total),
-		reportPassedLens.Set(passed),
-		reportFailedLens.Set(failed),
-		reportDurationLens.Set(time.Since(stateStartedAtLens.Get(state))),
-		reportOperationsLens.Set(ops),
-		reportFailuresLens.Set(filterFailedOutcomes(outcomes)),
+	return F.Pipe9(
+		state,
+		setReportEndpoint,
+		setReportTotal,
+		setReportPassed,
+		setReportFailed,
+		setReportStatus,
+		setReportDuration,
+		setReportOperations,
+		setReportFailures,
+		stateReportLens.Get,
 	)
 }
 

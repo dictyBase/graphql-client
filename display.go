@@ -23,6 +23,53 @@ var (
 	defaultHealthyLine = F.Constant(
 		[]string{"All GraphQL liveness probes passed."},
 	)
+	livenessSummaryHeaders = []string{
+		"Endpoint",
+		"Status",
+		"Probes",
+		"Passed",
+		"Failed",
+		"Duration",
+	}
+	livenessSummaryAlignments = []markdown.TableAlignment{
+		markdown.AlignLeft,
+		markdown.AlignLeft,
+		markdown.AlignRight,
+		markdown.AlignRight,
+		markdown.AlignRight,
+		markdown.AlignRight,
+	}
+	operationHealthHeaders = []string{
+		"Operation",
+		"Route Area",
+		"Passed",
+		"Failed",
+		"Latency",
+		"Status",
+	}
+	operationHealthAlignments = []markdown.TableAlignment{
+		markdown.AlignLeft,
+		markdown.AlignLeft,
+		markdown.AlignRight,
+		markdown.AlignRight,
+		markdown.AlignRight,
+		markdown.AlignLeft,
+	}
+	mapOperationHealthRows = A.Map(formatOperationHealthRow)
+	failureHeader          = F.Pipe1(
+		[]func(LivenessProbeOutcome) string{
+			failureOperationText,
+			failureLabelText,
+		},
+		strutils.ConcatFields[LivenessProbeOutcome](strutils.Space),
+	)
+	formatFailureBullet = F.Pipe1(
+		[]func(LivenessProbeOutcome) string{
+			failureHeader,
+			failureErrorText,
+		},
+		strutils.ConcatFields[LivenessProbeOutcome](strutils.Label),
+	)
 )
 
 func writePlasmidTable(w io.Writer, plasmids []Plasmid) {
@@ -99,29 +146,34 @@ func formatOperationHealthRow(op OperationHealth) []string {
 	}
 }
 
-func formatFailureBullet(failure LivenessProbeOutcome) string {
-	opCode := markdown.Code(outcomeOperationLens.Get(failure))
-	probeLabel := markdown.Code(outcomeLabelLens.Get(failure))
-	opHeader := strutils.Space.Concat(
-		markdown.Bold(opCode),
-		strutils.Parens(probeLabel),
-	)
-	return strutils.Label.Concat(
-		opHeader,
-		markdown.Code(outcomeErrorMsgLens.Get(failure)),
+func failureOperationText(failure LivenessProbeOutcome) string {
+	return F.Pipe3(
+		failure,
+		outcomeOperationLens.Get,
+		markdown.Code,
+		markdown.Bold,
 	)
 }
 
-func buildLivenessSummaryTable(report LivenessReport) markdown.TableSet {
-	headers := []string{
-		"Endpoint",
-		"Status",
-		"Probes",
-		"Passed",
-		"Failed",
-		"Duration",
-	}
-	rows := [][]string{
+func failureLabelText(failure LivenessProbeOutcome) string {
+	return F.Pipe3(
+		failure,
+		outcomeLabelLens.Get,
+		markdown.Code,
+		strutils.Parens,
+	)
+}
+
+func failureErrorText(failure LivenessProbeOutcome) string {
+	return F.Pipe2(
+		failure,
+		outcomeErrorMsgLens.Get,
+		markdown.Code,
+	)
+}
+
+func formatLivenessSummaryRows(report LivenessReport) [][]string {
+	return [][]string{
 		{
 			markdown.Code(reportEndpointLens.Get(report)),
 			markdown.Bold(reportStatusLens.Get(report)),
@@ -131,45 +183,23 @@ func buildLivenessSummaryTable(report LivenessReport) markdown.TableSet {
 			formatDurationCompact(reportDurationLens.Get(report)),
 		},
 	}
-	alignments := []markdown.TableAlignment{
-		markdown.AlignLeft,
-		markdown.AlignLeft,
-		markdown.AlignRight,
-		markdown.AlignRight,
-		markdown.AlignRight,
-		markdown.AlignRight,
-	}
+}
+
+func buildLivenessSummaryTable(report LivenessReport) markdown.TableSet {
 	return F.Pipe3(
 		markdown.TableSet{},
-		tableHeaderLens.Set(headers),
-		tableRowsLens.Set(rows),
-		tableAlignmentLens.Set(alignments),
+		tableHeaderLens.Set(livenessSummaryHeaders),
+		tableRowsLens.Set(formatLivenessSummaryRows(report)),
+		tableAlignmentLens.Set(livenessSummaryAlignments),
 	)
 }
 
 func buildOperationHealthTable(ops []OperationHealth) markdown.TableSet {
-	headers := []string{
-		"Operation",
-		"Route Area",
-		"Passed",
-		"Failed",
-		"Latency",
-		"Status",
-	}
-	rows := F.Pipe1(ops, A.Map(formatOperationHealthRow))
-	alignments := []markdown.TableAlignment{
-		markdown.AlignLeft,
-		markdown.AlignLeft,
-		markdown.AlignRight,
-		markdown.AlignRight,
-		markdown.AlignRight,
-		markdown.AlignLeft,
-	}
 	return F.Pipe3(
 		markdown.TableSet{},
-		tableHeaderLens.Set(headers),
-		tableRowsLens.Set(rows),
-		tableAlignmentLens.Set(alignments),
+		tableHeaderLens.Set(operationHealthHeaders),
+		tableRowsLens.Set(F.Pipe1(ops, mapOperationHealthRows)),
+		tableAlignmentLens.Set(operationHealthAlignments),
 	)
 }
 
