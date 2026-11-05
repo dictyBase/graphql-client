@@ -325,6 +325,13 @@ var (
 			return i
 		},
 	)
+	probeInputStartedAtLens = L.MakeLens(
+		func(i livenessProbeInput) time.Time { return i.StartedAt },
+		func(i livenessProbeInput, v time.Time) livenessProbeInput {
+			i.StartedAt = v
+			return i
+		},
+	)
 	probeInputOperationLens = F.Pipe1(
 		probeInputProbeLens,
 		L.Compose[livenessProbeInput](probeOperationLens),

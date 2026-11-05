@@ -9,7 +9,7 @@ import (
 	F "github.com/IBM/fp-go/v2/function"
 	IOE "github.com/IBM/fp-go/v2/ioeither"
 	O "github.com/IBM/fp-go/v2/option"
-	P "github.com/IBM/fp-go/v2/predicate"
+	S "github.com/IBM/fp-go/v2/string"
 	T "github.com/IBM/fp-go/v2/tuple"
 	graphql "github.com/hasura/go-graphql-client"
 	"github.com/urfave/cli/v3"
@@ -25,6 +25,26 @@ const (
 	gqlVarCursor = "cursor"
 	gqlVarFilter = "filter"
 	gqlVarInput  = "input"
+)
+
+// minStockQueryLen mirrors the server-side minimum query length of the
+// searchStocks operation.
+const minStockQueryLen = 2
+
+var (
+	nonEmptyStringOpt   = O.FromPredicate(S.IsNonEmpty)
+	hasMinStockQueryLen = predord.MinStrLen(minStockQueryLen)
+	errStockQueryConst  = F.Constant1[string](errStockQueryTooShort)
+	checkStockQueryLen  = E.FromPredicate(
+		hasMinStockQueryLen,
+		errStockQueryConst,
+	)
+	isNonEmptyOrderItems = predarrays.IsNonEmpty[string]()
+	errNoOrderItemsConst = F.Constant1[[]string](errNoOrderItems)
+	checkOrderItemsList  = E.FromPredicate(
+		isNonEmptyOrderItems,
+		errNoOrderItemsConst,
+	)
 )
 
 type (
@@ -51,19 +71,34 @@ type (
 	filteredStrainFetchArgs     = T.Tuple4[context.Context, *graphql.Client, int, StrainAttributeFilter]
 )
 
+func wrapGraphQLQueryErr(err error) error {
+	return fmt.Errorf("graphql query failed: %w", err)
+}
+
+func wrapGraphQLMutationErr(err error) error {
+	return fmt.Errorf("graphql mutation failed: %w", err)
+}
+
+func attachPlasmidType(
+	input listPlasmidCLIArgs,
+	plasmidType PlasmidType,
+) listPlasmidValidatedArgs {
+	return T.MakeTuple3(input.F1, input.F2, plasmidType)
+}
+
 func toListPlasmidValidatedArgs(
 	input listPlasmidCLIArgs,
-) IOE.IOEither[error, listPlasmidValidatedArgs] {
+) E.Either[error, listPlasmidValidatedArgs] {
 	return F.Pipe2(
-		ParsePlasmidType(input.F2.String(flagType)),
-		IOE.FromEither[error, PlasmidType],
-		IOE.Map[error](func(plasmidType PlasmidType) listPlasmidValidatedArgs {
-			return T.MakeTuple3(input.F1, input.F2, plasmidType)
-		}),
+		input.F2.String(flagType),
+		ParsePlasmidType,
+		E.Map[error](F.Bind1st(attachPlasmidType, input)),
 	)
 }
 
-func mapListPlasmidFetchArgs(input listPlasmidValidatedArgs) listPlasmidFetchArgs {
+func mapListPlasmidFetchArgs(
+	input listPlasmidValidatedArgs,
+) listPlasmidFetchArgs {
 	return T.MakeTuple4(
 		input.F1,
 		graphql.NewClient(input.F2.String(flagEndpoint), nil),
@@ -72,7 +107,9 @@ func mapListPlasmidFetchArgs(input listPlasmidValidatedArgs) listPlasmidFetchArg
 	)
 }
 
-func fetchListPlasmidsIO(input listPlasmidFetchArgs) IOE.IOEither[error, ListPlasmidsResult] {
+func fetchListPlasmidsIO(
+	input listPlasmidFetchArgs,
+) IOE.IOEither[error, ListPlasmidsResult] {
 	return F.Pipe2(
 		IOE.TryCatchError(func() (*ListPlasmidsQuery, error) {
 			query := new(ListPlasmidsQuery)
@@ -82,28 +119,28 @@ func fetchListPlasmidsIO(input listPlasmidFetchArgs) IOE.IOEither[error, ListPla
 				gqlVarFilter: input.F4,
 			})
 		}),
-		IOE.MapLeft[*ListPlasmidsQuery](func(err error) error {
-			return fmt.Errorf("graphql query failed: %w", err)
-		}),
+		IOE.MapLeft[*ListPlasmidsQuery](wrapGraphQLQueryErr),
 		IOE.Map[error]((*ListPlasmidsQuery).toResult),
 	)
+}
+
+func renderPlasmidListResult(result ListPlasmidsResult) error {
+	writePlasmidTable(os.Stdout, result.Plasmids)
+	writeSummary(os.Stdout, result)
+	return nil
 }
 
 func RunListPlasmidCLI(ctx context.Context, cmd *cli.Command) error {
 	return F.Pipe6(
 		T.MakeTuple2(ctx, cmd),
 		IOE.Of[error, listPlasmidCLIArgs],
-		IOE.Chain(toListPlasmidValidatedArgs),
+		IOE.ChainEitherK(toListPlasmidValidatedArgs),
 		IOE.Map[error](mapListPlasmidFetchArgs),
 		IOE.Chain(fetchListPlasmidsIO),
 		ioeutils.ToEither[error, ListPlasmidsResult],
 		E.Fold(
-			func(err error) error { return err },
-			func(result ListPlasmidsResult) error {
-				writePlasmidTable(os.Stdout, result.Plasmids)
-				writeSummary(os.Stdout, result)
-				return nil
-			},
+			F.Identity[error],
+			renderPlasmidListResult,
 		),
 	)
 }
@@ -120,11 +157,8 @@ func ParsePlasmidType(s string) E.Either[error, PlasmidType] {
 func stringPtr(s string) *string {
 	return F.Pipe2(
 		s,
-		O.FromPredicate(P.IsNonZero[string]()),
-		O.Fold(
-			func() *string { return nil },
-			func(s string) *string { return &s },
-		),
+		nonEmptyStringOpt,
+		O.ToNillable2[string],
 	)
 }
 
@@ -142,17 +176,17 @@ func buildPlasmidAttributeFilter(
 
 func toFilteredPlasmidValidatedArgs(
 	input filteredPlasmidCLIArgs,
-) IOE.IOEither[error, filteredPlasmidValidatedArgs] {
+) E.Either[error, filteredPlasmidValidatedArgs] {
 	return F.Pipe2(
-		ParsePlasmidType(input.F2.String(flagType)),
-		IOE.FromEither[error, PlasmidType],
-		IOE.Map[error](func(plasmidType PlasmidType) filteredPlasmidValidatedArgs {
-			return T.MakeTuple3(input.F1, input.F2, plasmidType)
-		}),
+		input.F2.String(flagType),
+		ParsePlasmidType,
+		E.Map[error](F.Bind1st(attachPlasmidType, input)),
 	)
 }
 
-func mapFilteredPlasmidFetchArgs(input filteredPlasmidValidatedArgs) filteredPlasmidFetchArgs {
+func mapFilteredPlasmidFetchArgs(
+	input filteredPlasmidValidatedArgs,
+) filteredPlasmidFetchArgs {
 	return T.MakeTuple4(
 		input.F1,
 		graphql.NewClient(input.F2.String(flagEndpoint), nil),
@@ -173,9 +207,7 @@ func fetchListFilteredPlasmidsIO(
 				gqlVarFilter: input.F4,
 			})
 		}),
-		IOE.MapLeft[*ListFilteredPlasmidsQuery](func(err error) error {
-			return fmt.Errorf("graphql query failed: %w", err)
-		}),
+		IOE.MapLeft[*ListFilteredPlasmidsQuery](wrapGraphQLQueryErr),
 		IOE.Map[error]((*ListFilteredPlasmidsQuery).toResult),
 	)
 }
@@ -184,17 +216,13 @@ func RunListFilteredPlasmidCLI(ctx context.Context, cmd *cli.Command) error {
 	return F.Pipe6(
 		T.MakeTuple2(ctx, cmd),
 		IOE.Of[error, filteredPlasmidCLIArgs],
-		IOE.Chain(toFilteredPlasmidValidatedArgs),
+		IOE.ChainEitherK(toFilteredPlasmidValidatedArgs),
 		IOE.Map[error](mapFilteredPlasmidFetchArgs),
 		IOE.Chain(fetchListFilteredPlasmidsIO),
 		ioeutils.ToEither[error, ListPlasmidsResult],
 		E.Fold(
-			func(err error) error { return err },
-			func(result ListPlasmidsResult) error {
-				writePlasmidTable(os.Stdout, result.Plasmids)
-				writeSummary(os.Stdout, result)
-				return nil
-			},
+			F.Identity[error],
+			renderPlasmidListResult,
 		),
 	)
 }
@@ -208,19 +236,26 @@ func ParseStrainType(s string) E.Either[error, StrainType] {
 	}
 }
 
+func attachStrainType(
+	input listStrainCLIArgs,
+	strainType StrainType,
+) listStrainValidatedArgs {
+	return T.MakeTuple3(input.F1, input.F2, strainType)
+}
+
 func toListStrainValidatedArgs(
 	input listStrainCLIArgs,
-) IOE.IOEither[error, listStrainValidatedArgs] {
+) E.Either[error, listStrainValidatedArgs] {
 	return F.Pipe2(
-		ParseStrainType(input.F2.String(flagType)),
-		IOE.FromEither[error, StrainType],
-		IOE.Map[error](func(strainType StrainType) listStrainValidatedArgs {
-			return T.MakeTuple3(input.F1, input.F2, strainType)
-		}),
+		input.F2.String(flagType),
+		ParseStrainType,
+		E.Map[error](F.Bind1st(attachStrainType, input)),
 	)
 }
 
-func mapListStrainFetchArgs(input listStrainValidatedArgs) listStrainFetchArgs {
+func mapListStrainFetchArgs(
+	input listStrainValidatedArgs,
+) listStrainFetchArgs {
 	return T.MakeTuple4(
 		input.F1,
 		graphql.NewClient(input.F2.String(flagEndpoint), nil),
@@ -229,7 +264,9 @@ func mapListStrainFetchArgs(input listStrainValidatedArgs) listStrainFetchArgs {
 	)
 }
 
-func fetchListStrainsIO(input listStrainFetchArgs) IOE.IOEither[error, ListStrainsResult] {
+func fetchListStrainsIO(
+	input listStrainFetchArgs,
+) IOE.IOEither[error, ListStrainsResult] {
 	return F.Pipe2(
 		IOE.TryCatchError(func() (*ListStrainsQuery, error) {
 			query := new(ListStrainsQuery)
@@ -239,28 +276,28 @@ func fetchListStrainsIO(input listStrainFetchArgs) IOE.IOEither[error, ListStrai
 				gqlVarFilter: input.F4,
 			})
 		}),
-		IOE.MapLeft[*ListStrainsQuery](func(err error) error {
-			return fmt.Errorf("graphql query failed: %w", err)
-		}),
+		IOE.MapLeft[*ListStrainsQuery](wrapGraphQLQueryErr),
 		IOE.Map[error]((*ListStrainsQuery).toResult),
 	)
+}
+
+func renderStrainListResult(result ListStrainsResult) error {
+	writeStrainTable(os.Stdout, result.Strains)
+	writeStrainSummary(os.Stdout, result)
+	return nil
 }
 
 func RunListStrainCLI(ctx context.Context, cmd *cli.Command) error {
 	return F.Pipe6(
 		T.MakeTuple2(ctx, cmd),
 		IOE.Of[error, listStrainCLIArgs],
-		IOE.Chain(toListStrainValidatedArgs),
+		IOE.ChainEitherK(toListStrainValidatedArgs),
 		IOE.Map[error](mapListStrainFetchArgs),
 		IOE.Chain(fetchListStrainsIO),
 		ioeutils.ToEither[error, ListStrainsResult],
 		E.Fold(
-			func(err error) error { return err },
-			func(result ListStrainsResult) error {
-				writeStrainTable(os.Stdout, result.Strains)
-				writeStrainSummary(os.Stdout, result)
-				return nil
-			},
+			F.Identity[error],
+			renderStrainListResult,
 		),
 	)
 }
@@ -279,17 +316,17 @@ func buildStrainAttributeFilter(
 
 func toFilteredStrainValidatedArgs(
 	input filteredStrainCLIArgs,
-) IOE.IOEither[error, filteredStrainValidatedArgs] {
+) E.Either[error, filteredStrainValidatedArgs] {
 	return F.Pipe2(
-		ParseStrainType(input.F2.String(flagType)),
-		IOE.FromEither[error, StrainType],
-		IOE.Map[error](func(strainType StrainType) filteredStrainValidatedArgs {
-			return T.MakeTuple3(input.F1, input.F2, strainType)
-		}),
+		input.F2.String(flagType),
+		ParseStrainType,
+		E.Map[error](F.Bind1st(attachStrainType, input)),
 	)
 }
 
-func mapFilteredStrainFetchArgs(input filteredStrainValidatedArgs) filteredStrainFetchArgs {
+func mapFilteredStrainFetchArgs(
+	input filteredStrainValidatedArgs,
+) filteredStrainFetchArgs {
 	return T.MakeTuple4(
 		input.F1,
 		graphql.NewClient(input.F2.String(flagEndpoint), nil),
@@ -310,9 +347,7 @@ func fetchListFilteredStrainsIO(
 				gqlVarFilter: input.F4,
 			})
 		}),
-		IOE.MapLeft[*ListFilteredStrainsQuery](func(err error) error {
-			return fmt.Errorf("graphql query failed: %w", err)
-		}),
+		IOE.MapLeft[*ListFilteredStrainsQuery](wrapGraphQLQueryErr),
 		IOE.Map[error]((*ListFilteredStrainsQuery).toResult),
 	)
 }
@@ -321,17 +356,13 @@ func RunListFilteredStrainCLI(ctx context.Context, cmd *cli.Command) error {
 	return F.Pipe6(
 		T.MakeTuple2(ctx, cmd),
 		IOE.Of[error, filteredStrainCLIArgs],
-		IOE.Chain(toFilteredStrainValidatedArgs),
+		IOE.ChainEitherK(toFilteredStrainValidatedArgs),
 		IOE.Map[error](mapFilteredStrainFetchArgs),
 		IOE.Chain(fetchListFilteredStrainsIO),
 		ioeutils.ToEither[error, ListStrainsResult],
 		E.Fold(
-			func(err error) error { return err },
-			func(result ListStrainsResult) error {
-				writeStrainTable(os.Stdout, result.Strains)
-				writeStrainSummary(os.Stdout, result)
-				return nil
-			},
+			F.Identity[error],
+			renderStrainListResult,
 		),
 	)
 }
@@ -354,64 +385,69 @@ type searchStockFetchArgs struct {
 	Entity StockEntityType
 }
 
-// minStockQueryLen mirrors the server-side minimum query length of the
-// searchStocks operation.
-const minStockQueryLen = 2
-
 // validateStockQuery checks that the --query flag meets the server's
 // minimum query length and passes the state through unchanged.
-func validateStockQuery(args searchStockCLIArgs) E.Either[error, searchStockCLIArgs] {
+func validateStockQuery(
+	args searchStockCLIArgs,
+) E.Either[error, searchStockCLIArgs] {
+	cmd := searchCLICmdLens.Get(args)
 	return F.Pipe2(
-		args.Command.String(flagQuery),
-		E.FromPredicate(
-			predord.MinStrLen(minStockQueryLen),
-			func(string) error { return errStockQueryTooShort },
-		),
-		E.Map[error](func(string) searchStockCLIArgs { return args }),
+		cmd.String(flagQuery),
+		checkStockQueryLen,
+		E.Map[error](F.Constant1[string](args)),
 	)
 }
 
 // parseStockEntity validates the --entity flag of the search-stocks
 // command and passes the state through unchanged.
-func parseStockEntity(args searchStockCLIArgs) E.Either[error, searchStockCLIArgs] {
+func parseStockEntity(
+	args searchStockCLIArgs,
+) E.Either[error, searchStockCLIArgs] {
+	cmd := searchCLICmdLens.Get(args)
 	return F.Pipe2(
-		args.Command.String(flagEntity),
+		cmd.String(flagEntity),
 		ParseStockEntityType,
-		E.Map[error](func(StockEntityType) searchStockCLIArgs { return args }),
+		E.Map[error](F.Constant1[StockEntityType](args)),
 	)
 }
 
 // toSearchStockFetchArgs builds the GraphQL call inputs from the command
 // flags of the search-stocks command.
 func toSearchStockFetchArgs(args searchStockCLIArgs) searchStockFetchArgs {
-	endpoint := args.Command.String(flagEndpoint)
+	cmd := searchCLICmdLens.Get(args)
+	endpoint := cmd.String(flagEndpoint)
 	client := graphql.NewClient(endpoint, nil)
-	entity := StockEntityType(args.Command.String(flagEntity))
+	entity := StockEntityType(cmd.String(flagEntity))
 	return F.Pipe5(
 		searchStockFetchArgs{},
-		searchFetchCtxLens.Set(args.Context),
+		searchFetchCtxLens.Set(searchCLICtxLens.Get(args)),
 		searchFetchClientLens.Set(client),
-		searchFetchQueryLens.Set(args.Command.String(flagQuery)),
-		searchFetchLimitLens.Set(args.Command.Int(flagLimit)),
+		searchFetchQueryLens.Set(cmd.String(flagQuery)),
+		searchFetchLimitLens.Set(cmd.Int(flagLimit)),
 		searchFetchEntityLens.Set(entity),
 	)
 }
 
 // fetchSearchStocksIO sends the searchStocks query through a client
 // built from the command's endpoint flag.
-func fetchSearchStocksIO(input searchStockFetchArgs) IOE.IOEither[error, SearchStocksResult] {
+func fetchSearchStocksIO(
+	input searchStockFetchArgs,
+) IOE.IOEither[error, SearchStocksResult] {
+	client := searchFetchClientLens.Get(input)
+	ctx := searchFetchCtxLens.Get(input)
+	queryStr := searchFetchQueryLens.Get(input)
+	limit := searchFetchLimitLens.Get(input)
+	entity := searchFetchEntityLens.Get(input)
 	return F.Pipe2(
 		IOE.TryCatchError(func() (*SearchStocksQuery, error) {
 			query := new(SearchStocksQuery)
-			return query, input.Client.Query(input.Ctx, query, map[string]any{
-				flagQuery:  input.Query,
-				flagLimit:  input.Limit,
-				flagEntity: input.Entity,
+			return query, client.Query(ctx, query, map[string]any{
+				flagQuery:  queryStr,
+				flagLimit:  limit,
+				flagEntity: entity,
 			})
 		}),
-		IOE.MapLeft[*SearchStocksQuery](func(err error) error {
-			return fmt.Errorf("graphql query failed: %w", err)
-		}),
+		IOE.MapLeft[*SearchStocksQuery](wrapGraphQLQueryErr),
 		IOE.Map[error]((*SearchStocksQuery).toResult),
 	)
 }
@@ -423,6 +459,12 @@ func ParseStockEntityType(s string) E.Either[error, StockEntityType] {
 	default:
 		return E.Left[StockEntityType](errInvalidStockEntityType(et))
 	}
+}
+
+func renderStockSearchResult(result SearchStocksResult) error {
+	writeStockSearchTable(os.Stdout, result.Results)
+	writeStockSearchSummary(os.Stdout, result)
+	return nil
 }
 
 func RunSearchStockCLI(ctx context.Context, cmd *cli.Command) error {
@@ -437,12 +479,8 @@ func RunSearchStockCLI(ctx context.Context, cmd *cli.Command) error {
 		IOE.Chain(fetchSearchStocksIO),
 		ioeutils.ToEither[error, SearchStocksResult],
 		E.Fold(
-			func(err error) error { return err },
-			func(result SearchStocksResult) error {
-				writeStockSearchTable(os.Stdout, result.Results)
-				writeStockSearchSummary(os.Stdout, result)
-				return nil
-			},
+			F.Identity[error],
+			renderStockSearchResult,
 		),
 	)
 }
@@ -467,51 +505,55 @@ func ParseStatus(s string) E.Either[error, StatusEnum] {
 func validateEmail(field string) E.Kleisli[error, string, string] {
 	return E.FromPredicate(
 		predstrings.HasAtSign,
-		func(string) error { return errInvalidEmail(field) },
+		F.Constant1[string](errInvalidEmail(field)),
 	)
 }
 
 // validateOrderEmails checks the consumer, payer, and purchaser email flags
 // of the create-order command and passes the state through unchanged.
-func validateOrderEmails(args createOrderCLIArgs) E.Either[error, createOrderCLIArgs] {
+func validateOrderEmails(
+	args createOrderCLIArgs,
+) E.Either[error, createOrderCLIArgs] {
+	cmd := orderCLICmdLens.Get(args)
 	return F.Pipe2(
 		T.MakeTuple3(
-			args.Command.String(flagConsumer),
-			args.Command.String(flagPayer),
-			args.Command.String(flagPurchaser),
+			cmd.String(flagConsumer),
+			cmd.String(flagPayer),
+			cmd.String(flagPurchaser),
 		),
 		E.TraverseTuple3(
 			validateEmail("consumer"),
 			validateEmail("payer"),
 			validateEmail("purchaser"),
 		),
-		E.Map[error](func(T.Tuple3[string, string, string]) createOrderCLIArgs {
-			return args
-		}),
+		E.Map[error](F.Constant1[T.Tuple3[string, string, string]](args)),
 	)
 }
 
-func validateOrderStatus(args createOrderCLIArgs) E.Either[error, createOrderCLIArgs] {
+func validateOrderStatus(
+	args createOrderCLIArgs,
+) E.Either[error, createOrderCLIArgs] {
+	cmd := orderCLICmdLens.Get(args)
 	return F.Pipe2(
-		args.Command.String(flagStatus),
+		cmd.String(flagStatus),
 		ParseStatus,
-		E.Map[error](func(StatusEnum) createOrderCLIArgs { return args }),
+		E.Map[error](F.Constant1[StatusEnum](args)),
 	)
 }
 
-func validateOrderItems(args createOrderCLIArgs) E.Either[error, createOrderCLIArgs] {
+func validateOrderItems(
+	args createOrderCLIArgs,
+) E.Either[error, createOrderCLIArgs] {
+	cmd := orderCLICmdLens.Get(args)
 	return F.Pipe2(
-		args.Command.StringSlice(flagItems),
-		E.FromPredicate(
-			predarrays.IsNonEmpty[string](),
-			func([]string) error { return errNoOrderItems },
-		),
-		E.Map[error](func([]string) createOrderCLIArgs { return args }),
+		cmd.StringSlice(flagItems),
+		checkOrderItemsList,
+		E.Map[error](F.Constant1[[]string](args)),
 	)
 }
 
 func toCreateOrderInput(args createOrderCLIArgs) CreateOrderInfo {
-	cmd := args.Command
+	cmd := orderCLICmdLens.Get(args)
 	input := F.Pipe12(
 		CreateOrderInput{},
 		orderCourierLens.Set(cmd.String(flagCourier)),
@@ -530,7 +572,7 @@ func toCreateOrderInput(args createOrderCLIArgs) CreateOrderInfo {
 	return F.Pipe3(
 		CreateOrderInfo{},
 		orderInfoEndpointLens.Set(cmd.String(flagEndpoint)),
-		orderInfoCtxLens.Set(args.Context),
+		orderInfoCtxLens.Set(orderCLICtxLens.Get(args)),
 		orderInfoInputLens.Set(input),
 	)
 }
@@ -538,22 +580,21 @@ func toCreateOrderInput(args createOrderCLIArgs) CreateOrderInfo {
 // mutateCreateOrder sends the createOrder mutation with the given input
 // through a client built from the command's endpoint flag.
 func mutateCreateOrder(info CreateOrderInfo) IOE.IOEither[error, string] {
+	endpoint := orderInfoEndpointLens.Get(info)
+	ctx := orderInfoCtxLens.Get(info)
+	input := orderInfoInputLens.Get(info)
 	return F.Pipe2(
 		IOE.TryCatchError(func() (*CreateOrderMutation, error) {
 			mutation := new(CreateOrderMutation)
-			client := graphql.NewClient(info.Endpoint, nil)
+			client := graphql.NewClient(endpoint, nil)
 			return mutation, client.Mutate(
-				info.Ctx,
+				ctx,
 				mutation,
-				map[string]any{gqlVarInput: info.Input},
+				map[string]any{gqlVarInput: input},
 			)
 		}),
-		IOE.MapLeft[*CreateOrderMutation](func(err error) error {
-			return fmt.Errorf("graphql mutation failed: %w", err)
-		}),
-		IOE.Map[error](func(mutation *CreateOrderMutation) string {
-			return string(mutation.CreateOrder.ID)
-		}),
+		IOE.MapLeft[*CreateOrderMutation](wrapGraphQLMutationErr),
+		IOE.Map[error]((*CreateOrderMutation).toOrderID),
 	)
 }
 
@@ -568,6 +609,11 @@ func submitCreateOrder(args createOrderCLIArgs) IOE.IOEither[error, string] {
 	)
 }
 
+func renderCreatedOrderResult(orderID string) error {
+	writeCreatedOrder(os.Stdout, orderID)
+	return nil
+}
+
 func RunCreateOrderCLI(ctx context.Context, cmd *cli.Command) error {
 	return F.Pipe9(
 		createOrderCLIArgs{},
@@ -580,11 +626,8 @@ func RunCreateOrderCLI(ctx context.Context, cmd *cli.Command) error {
 		IOE.Chain(submitCreateOrder),
 		ioeutils.ToEither[error, string],
 		E.Fold(
-			func(err error) error { return err },
-			func(orderID string) error {
-				writeCreatedOrder(os.Stdout, orderID)
-				return nil
-			},
+			F.Identity[error],
+			renderCreatedOrderResult,
 		),
 	)
 }

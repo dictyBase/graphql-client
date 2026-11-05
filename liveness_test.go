@@ -97,7 +97,7 @@ func TestValidateLivenessArgs(t *testing.T) {
 }
 
 func TestValidateProbePayload(t *testing.T) {
-	validate := validateProbePayload("strain")
+	validate := F.Bind1st(validateProbePayload, "strain")
 
 	t.Run("empty payload fails", func(t *testing.T) {
 		_, err := E.Unwrap(validate(nil))
@@ -276,5 +276,9 @@ func TestPipelineCheckLivenessEntrypoint(t *testing.T) {
 	pipelinecheck.RequireNoNonRawTryCatchCallback(t, cfg)
 	pipelinecheck.RequireNoIfErrInTryCatch(t, cfg)
 	pipelinecheck.RequireBareIf(t, cfg)
+	pipelinecheck.RequireSafePrintf(t, cfg)
+	pipelinecheck.RequireNoRedundantFold(t, cfg)
+	pipelinecheck.RequireNoHandRolledFileJoinInArrayMap(t, cfg)
+	pipelinecheck.RequireNoDirectApply(t, cfg)
 	pipelinecheck.RequireNoPopulatedStruct(t, cfg)
 }
