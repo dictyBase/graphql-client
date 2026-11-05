@@ -1,6 +1,10 @@
 package main
 
-import "time"
+import (
+	"time"
+
+	F "github.com/IBM/fp-go/v2/function"
+)
 
 const (
 	livenessCatalogLimit   = 12
@@ -244,8 +248,7 @@ const (
       }
     }
     genes {
-      name
-    }
+      name\n    }
     in_stock
     systematic_name
     genotypes
@@ -336,20 +339,43 @@ type LivenessReport struct {
 	Failures   []LivenessProbeOutcome
 }
 
+func newOperationSpec(op, routeArea string) LivenessOperationSpec {
+	return F.Pipe2(
+		LivenessOperationSpec{},
+		specOperationLens.Set(op),
+		specRouteAreaLens.Set(routeArea),
+	)
+}
+
+func newLivenessProbe(
+	op, routeArea, rootField, label, queryDoc string,
+	vars map[string]any,
+) LivenessProbe {
+	return F.Pipe6(
+		LivenessProbe{},
+		probeOperationLens.Set(op),
+		probeRouteAreaLens.Set(routeArea),
+		probeRootFieldLens.Set(rootField),
+		probeLabelLens.Set(label),
+		probeQueryLens.Set(queryDoc),
+		probeVariablesLens.Set(vars),
+	)
+}
+
 func defaultLivenessOperationSpecs() []LivenessOperationSpec {
 	return []LivenessOperationSpec{
-		{Operation: opStrainList, RouteArea: routeCatalogAndStrains},
-		{Operation: opPlasmidListFilter, RouteArea: routeCatalogAndPlasmids},
-		{Operation: opSearchStocks, RouteArea: routeCatalogSearch},
-		{Operation: opListStockSuggestions, RouteArea: routeNavbarSearch},
-		{Operation: opPublication, RouteArea: routeReferencePreview},
-		{Operation: opContentBySlug, RouteArea: routeInfoAndCommunity},
-		{Operation: opStrain, RouteArea: routeStrainDetail},
-		{Operation: opPlasmid, RouteArea: routePlasmidDetail},
-		{Operation: opListStrainsWithPhenotype, RouteArea: routePhenotypeList},
-		{Operation: opListPhenotypes, RouteArea: routeEditablePhenotype},
-		{Operation: opListPhenotypeEnvironments, RouteArea: routeEditablePhenotype},
-		{Operation: opListPhenotypeAssays, RouteArea: routeEditablePhenotype},
+		newOperationSpec(opStrainList, routeCatalogAndStrains),
+		newOperationSpec(opPlasmidListFilter, routeCatalogAndPlasmids),
+		newOperationSpec(opSearchStocks, routeCatalogSearch),
+		newOperationSpec(opListStockSuggestions, routeNavbarSearch),
+		newOperationSpec(opPublication, routeReferencePreview),
+		newOperationSpec(opContentBySlug, routeInfoAndCommunity),
+		newOperationSpec(opStrain, routeStrainDetail),
+		newOperationSpec(opPlasmid, routePlasmidDetail),
+		newOperationSpec(opListStrainsWithPhenotype, routePhenotypeList),
+		newOperationSpec(opListPhenotypes, routeEditablePhenotype),
+		newOperationSpec(opListPhenotypeEnvironments, routeEditablePhenotype),
+		newOperationSpec(opListPhenotypeAssays, routeEditablePhenotype),
 	}
 }
 
@@ -367,51 +393,51 @@ func catalogLivenessProbes() []LivenessProbe {
 
 func searchAndPublicationLivenessProbes() []LivenessProbe {
 	return []LivenessProbe{
-		{
-			Operation: opSearchStocks,
-			RouteArea: routeCatalogSearch,
-			RootField: rootFieldSearchStocks,
-			Label:     `query="act"`,
-			Query:     gqlDocSearchStocks,
-			Variables: map[string]any{
+		newLivenessProbe(
+			opSearchStocks,
+			routeCatalogSearch,
+			rootFieldSearchStocks,
+			`query="act"`,
+			gqlDocSearchStocks,
+			map[string]any{
 				flagQuery: sampleQueryAct,
 				flagLimit: livenessSearchLimit,
 			},
-		},
-		{
-			Operation: opSearchStocks,
-			RouteArea: routeCatalogSearch,
-			RootField: rootFieldSearchStocks,
-			Label:     `query="act", entity=STRAIN`,
-			Query:     gqlDocSearchStocks,
-			Variables: map[string]any{
+		),
+		newLivenessProbe(
+			opSearchStocks,
+			routeCatalogSearch,
+			rootFieldSearchStocks,
+			`query="act", entity=STRAIN`,
+			gqlDocSearchStocks,
+			map[string]any{
 				flagQuery:  sampleQueryAct,
 				flagLimit:  livenessSearchLimit,
 				flagEntity: string(StockEntityStrain),
 			},
-		},
-		{
-			Operation: opSearchStocks,
-			RouteArea: routeCatalogSearch,
-			RootField: rootFieldSearchStocks,
-			Label:     `query="act", entity=PLASMID`,
-			Query:     gqlDocSearchStocks,
-			Variables: map[string]any{
+		),
+		newLivenessProbe(
+			opSearchStocks,
+			routeCatalogSearch,
+			rootFieldSearchStocks,
+			`query="act", entity=PLASMID`,
+			gqlDocSearchStocks,
+			map[string]any{
 				flagQuery:  sampleQueryAct,
 				flagLimit:  livenessSearchLimit,
 				flagEntity: string(StockEntityPlasmid),
 			},
-		},
+		),
 		newSuggestionProbe(sampleQueryAct),
 		newSuggestionProbe("gfp"),
-		{
-			Operation: opPublication,
-			RouteArea: routeReferencePreview,
-			RootField: "publication",
-			Label:     `id="12857872"`,
-			Query:     gqlDocPublication,
-			Variables: map[string]any{"id": "12857872"},
-		},
+		newLivenessProbe(
+			opPublication,
+			routeReferencePreview,
+			"publication",
+			`id="12857872"`,
+			gqlDocPublication,
+			map[string]any{"id": "12857872"},
+		),
 	}
 }
 
@@ -460,105 +486,105 @@ func phenotypeLivenessProbes() []LivenessProbe {
 func newPhenotypeAutocompleteProbe(
 	op, rootField, queryDoc, search string,
 ) LivenessProbe {
-	return LivenessProbe{
-		Operation: op,
-		RouteArea: routeEditablePhenotype,
-		RootField: rootField,
-		Label:     `search="` + search + `"`,
-		Query:     queryDoc,
-		Variables: map[string]any{"search": search},
-	}
+	return newLivenessProbe(
+		op,
+		routeEditablePhenotype,
+		rootField,
+		`search="`+search+`"`,
+		queryDoc,
+		map[string]any{"search": search},
+	)
 }
 
 func newStrainListProbe(label string, strainType StrainType) LivenessProbe {
-	return LivenessProbe{
-		Operation: opStrainList,
-		RouteArea: routeCatalogAndStrains,
-		RootField: "listStrains",
-		Label:     label,
-		Query:     gqlDocStrainList,
-		Variables: map[string]any{
+	return newLivenessProbe(
+		opStrainList,
+		routeCatalogAndStrains,
+		"listStrains",
+		label,
+		gqlDocStrainList,
+		map[string]any{
 			gqlVarCursor: 0,
 			flagLimit:    livenessCatalogLimit,
 			gqlVarFilter: map[string]any{"strain_type": string(strainType)},
 		},
-	}
+	)
 }
 
 func newPlasmidListProbe(label string, plasmidType PlasmidType) LivenessProbe {
-	return LivenessProbe{
-		Operation: opPlasmidListFilter,
-		RouteArea: routeCatalogAndPlasmids,
-		RootField: "listPlasmids",
-		Label:     label,
-		Query:     gqlDocPlasmidListFilter,
-		Variables: map[string]any{
+	return newLivenessProbe(
+		opPlasmidListFilter,
+		routeCatalogAndPlasmids,
+		"listPlasmids",
+		label,
+		gqlDocPlasmidListFilter,
+		map[string]any{
 			gqlVarCursor: 0,
 			flagLimit:    livenessCatalogLimit,
 			gqlVarFilter: map[string]any{"plasmid_type": string(plasmidType)},
 		},
-	}
+	)
 }
 
 func newSuggestionProbe(query string) LivenessProbe {
-	return LivenessProbe{
-		Operation: opListStockSuggestions,
-		RouteArea: routeNavbarSearch,
-		RootField: "listStockSuggestions",
-		Label:     `query="` + query + `"`,
-		Query:     gqlDocListStockSuggestions,
-		Variables: map[string]any{
-			"query": query,
-			"limit": livenessCatalogLimit,
+	return newLivenessProbe(
+		opListStockSuggestions,
+		routeNavbarSearch,
+		"listStockSuggestions",
+		`query="`+query+`"`,
+		gqlDocListStockSuggestions,
+		map[string]any{
+			flagQuery: query,
+			flagLimit: livenessCatalogLimit,
 		},
-	}
+	)
 }
 
 func newContentSlugProbe(slug string) LivenessProbe {
-	return LivenessProbe{
-		Operation: opContentBySlug,
-		RouteArea: routeInfoAndCommunity,
-		RootField: "contentBySlug",
-		Label:     `slug="` + slug + `"`,
-		Query:     gqlDocContentBySlug,
-		Variables: map[string]any{"slug": slug},
-	}
+	return newLivenessProbe(
+		opContentBySlug,
+		routeInfoAndCommunity,
+		"contentBySlug",
+		`slug="`+slug+`"`,
+		gqlDocContentBySlug,
+		map[string]any{"slug": slug},
+	)
 }
 
 func newStrainDetailProbe(id string) LivenessProbe {
-	return LivenessProbe{
-		Operation: opStrain,
-		RouteArea: routeStrainDetail,
-		RootField: "strain",
-		Label:     `id="` + id + `"`,
-		Query:     gqlDocStrain,
-		Variables: map[string]any{"id": id},
-	}
+	return newLivenessProbe(
+		opStrain,
+		routeStrainDetail,
+		"strain",
+		`id="`+id+`"`,
+		gqlDocStrain,
+		map[string]any{"id": id},
+	)
 }
 
 func newPlasmidDetailProbe(id string) LivenessProbe {
-	return LivenessProbe{
-		Operation: opPlasmid,
-		RouteArea: routePlasmidDetail,
-		RootField: "plasmid",
-		Label:     `id="` + id + `"`,
-		Query:     gqlDocPlasmid,
-		Variables: map[string]any{"id": id},
-	}
+	return newLivenessProbe(
+		opPlasmid,
+		routePlasmidDetail,
+		"plasmid",
+		`id="`+id+`"`,
+		gqlDocPlasmid,
+		map[string]any{"id": id},
+	)
 }
 
 func newPhenotypeStrainsProbe(annotation string) LivenessProbe {
-	return LivenessProbe{
-		Operation: opListStrainsWithPhenotype,
-		RouteArea: routePhenotypeList,
-		RootField: "listStrainsWithAnnotation",
-		Label:     `annotation="` + annotation + `"`,
-		Query:     gqlDocListStrainsWithPhenotype,
-		Variables: map[string]any{
+	return newLivenessProbe(
+		opListStrainsWithPhenotype,
+		routePhenotypeList,
+		"listStrainsWithAnnotation",
+		`annotation="`+annotation+`"`,
+		gqlDocListStrainsWithPhenotype,
+		map[string]any{
 			gqlVarCursor: 0,
 			flagLimit:    livenessPhenotypeLimit,
 			"type":       "phenotype",
 			"annotation": annotation,
 		},
-	}
+	)
 }

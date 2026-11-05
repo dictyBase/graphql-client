@@ -83,79 +83,87 @@ func formatDurationCompact(d time.Duration) string {
 
 func formatOperationHealthRow(op OperationHealth) []string {
 	return []string{
-		markdown.Code(op.Operation),
-		op.RouteArea,
-		fmt.Sprintf("%d/%d", op.Passed, op.Total),
-		strconv.Itoa(op.Failed),
-		formatDurationCompact(op.Latency),
-		markdown.Bold(op.Status),
+		markdown.Code(opHealthOperationLens.Get(op)),
+		opHealthRouteAreaLens.Get(op),
+		fmt.Sprintf("%d/%d", opHealthPassedLens.Get(op), opHealthTotalLens.Get(op)),
+		strconv.Itoa(opHealthFailedLens.Get(op)),
+		formatDurationCompact(opHealthLatencyLens.Get(op)),
+		markdown.Bold(opHealthStatusLens.Get(op)),
 	}
 }
 
 func formatFailureBullet(failure LivenessProbeOutcome) string {
-	opCode := markdown.Code(failure.Probe.Operation)
-	probeLabel := markdown.Code(failure.Probe.Label)
+	opCode := markdown.Code(outcomeOperationLens.Get(failure))
+	probeLabel := markdown.Code(outcomeLabelLens.Get(failure))
 	opHeader := strutils.Space.Concat(
 		markdown.Bold(opCode),
 		strutils.Parens(probeLabel),
 	)
 	return strutils.Label.Concat(
 		opHeader,
-		markdown.Code(failure.ErrorMsg),
+		markdown.Code(outcomeErrorMsgLens.Get(failure)),
 	)
 }
 
 func buildLivenessSummaryTable(report LivenessReport) markdown.TableSet {
-	return markdown.TableSet{
-		Header: []string{
-			"Endpoint",
-			"Status",
-			"Probes",
-			"Passed",
-			"Failed",
-			"Duration",
-		},
-		Rows: [][]string{
-			{
-				markdown.Code(report.Endpoint),
-				markdown.Bold(report.Status),
-				strconv.Itoa(report.Total),
-				strconv.Itoa(report.Passed),
-				strconv.Itoa(report.Failed),
-				formatDurationCompact(report.Duration),
-			},
-		},
-		Alignment: []markdown.TableAlignment{
-			markdown.AlignLeft,
-			markdown.AlignLeft,
-			markdown.AlignRight,
-			markdown.AlignRight,
-			markdown.AlignRight,
-			markdown.AlignRight,
+	headers := []string{
+		"Endpoint",
+		"Status",
+		"Probes",
+		"Passed",
+		"Failed",
+		"Duration",
+	}
+	rows := [][]string{
+		{
+			markdown.Code(reportEndpointLens.Get(report)),
+			markdown.Bold(reportStatusLens.Get(report)),
+			strconv.Itoa(reportTotalLens.Get(report)),
+			strconv.Itoa(reportPassedLens.Get(report)),
+			strconv.Itoa(reportFailedLens.Get(report)),
+			formatDurationCompact(reportDurationLens.Get(report)),
 		},
 	}
+	alignments := []markdown.TableAlignment{
+		markdown.AlignLeft,
+		markdown.AlignLeft,
+		markdown.AlignRight,
+		markdown.AlignRight,
+		markdown.AlignRight,
+		markdown.AlignRight,
+	}
+	return F.Pipe3(
+		markdown.TableSet{},
+		tableHeaderLens.Set(headers),
+		tableRowsLens.Set(rows),
+		tableAlignmentLens.Set(alignments),
+	)
 }
 
 func buildOperationHealthTable(ops []OperationHealth) markdown.TableSet {
-	return markdown.TableSet{
-		Header: []string{
-			"Operation",
-			"Route Area",
-			"Passed",
-			"Failed",
-			"Latency",
-			"Status",
-		},
-		Rows: F.Pipe1(ops, A.Map(formatOperationHealthRow)),
-		Alignment: []markdown.TableAlignment{
-			markdown.AlignLeft,
-			markdown.AlignLeft,
-			markdown.AlignRight,
-			markdown.AlignRight,
-			markdown.AlignRight,
-			markdown.AlignLeft,
-		},
+	headers := []string{
+		"Operation",
+		"Route Area",
+		"Passed",
+		"Failed",
+		"Latency",
+		"Status",
 	}
+	rows := F.Pipe1(ops, A.Map(formatOperationHealthRow))
+	alignments := []markdown.TableAlignment{
+		markdown.AlignLeft,
+		markdown.AlignLeft,
+		markdown.AlignRight,
+		markdown.AlignRight,
+		markdown.AlignRight,
+		markdown.AlignLeft,
+	}
+	return F.Pipe3(
+		markdown.TableSet{},
+		tableHeaderLens.Set(headers),
+		tableRowsLens.Set(rows),
+		tableAlignmentLens.Set(alignments),
+	)
 }
 
 func buildFailureSummaryLines(failures []LivenessProbeOutcome) []string {
@@ -173,8 +181,8 @@ func buildFailureSummaryLines(failures []LivenessProbeOutcome) []string {
 
 func writeLivenessMarkdown(w io.Writer, report LivenessReport) error {
 	summaryTable := buildLivenessSummaryTable(report)
-	opTable := buildOperationHealthTable(report.Operations)
-	failureLines := buildFailureSummaryLines(report.Failures)
+	opTable := buildOperationHealthTable(reportOperationsLens.Get(report))
+	failureLines := buildFailureSummaryLines(reportFailuresLens.Get(report))
 	return markdown.NewMarkdown(w, markdown.WithBlockSpacing()).
 		H1("GraphQL API Liveness Report").
 		Table(summaryTable).
