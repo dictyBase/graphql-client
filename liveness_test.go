@@ -281,4 +281,5 @@ func TestPipelineCheckLivenessEntrypoint(t *testing.T) {
 	pipelinecheck.RequireNoHandRolledFileJoinInArrayMap(t, cfg)
 	pipelinecheck.RequireNoDirectApply(t, cfg)
 	pipelinecheck.RequireNoPopulatedStruct(t, cfg)
+	pipelinecheck.RequireNoLocalPipeClosure(t, cfg)
 }
