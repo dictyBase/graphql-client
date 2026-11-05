@@ -1,16 +1,32 @@
 module github.com/dictybase-docker/graphql-client
 
-go 1.25.5
+go 1.26.0
 
 require (
-	github.com/IBM/fp-go/v2 v2.3.82 // indirect
+	github.com/IBM/fp-go/v2 v2.13.0
+	github.com/dictyBase/fp-go-loom v0.3.0
+	github.com/hasura/go-graphql-client v0.16.0
+	github.com/nao1215/markdown v1.1.1
+	github.com/stretchr/testify v1.12.1
+	github.com/urfave/cli/v3 v3.14.0
+)
+
+require (
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/clipperhouse/displaywidth v0.11.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dictyBase/fp-go-loom v0.0.0-20260718205839-83fde4808bdb // indirect
+	github.com/fatih/color v1.19.0 // indirect
+	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/hasura/go-graphql-client v0.16.0 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/urfave/cli/v3 v3.10.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	github.com/karrick/godirwalk v1.17.0 // indirect
+	github.com/mattn/go-colorable v0.1.15 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/mattn/go-runewidth v0.0.30 // indirect
+	github.com/olekukonko/cat v0.0.0-20250911104152-50322a0618f6 // indirect
+	github.com/olekukonko/errors v1.3.0 // indirect
+	github.com/olekukonko/ll v0.1.8 // indirect
+	github.com/olekukonko/tablewriter v1.1.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 )
