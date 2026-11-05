@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"slices"
 	"time"
 
 	A "github.com/IBM/fp-go/v2/array"
@@ -64,7 +63,7 @@ type livenessProbeInput struct {
 }
 
 func defaultLivenessProbes() []LivenessProbe {
-	return slices.Concat(
+	return A.ArrayConcatAll(
 		catalogLivenessProbes(),
 		searchAndPublicationLivenessProbes(),
 		contentAndDetailLivenessProbes(),

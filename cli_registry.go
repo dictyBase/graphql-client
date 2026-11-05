@@ -1,8 +1,7 @@
 package main
 
 import (
-	"slices"
-
+	A "github.com/IBM/fp-go/v2/array"
 	"github.com/urfave/cli/v3"
 )
 
@@ -121,7 +120,7 @@ func newCreateOrderCommand() *cli.Command {
 		Name:   "create-order",
 		Usage:  "Create a stock order through the GraphQL endpoint",
 		Action: RunCreateOrderCLI,
-		Flags: slices.Concat(
+		Flags: A.ArrayConcatAll(
 			orderContactFlags(),
 			orderShipmentFlags(),
 			orderRecordFlags(),
