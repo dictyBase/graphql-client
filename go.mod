@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/IBM/fp-go/v2 v2.13.0
-	github.com/dictyBase/fp-go-loom v0.4.0
+	github.com/dictyBase/fp-go-loom v0.5.0
 	github.com/hasura/go-graphql-client v0.16.0
 	github.com/nao1215/markdown v1.1.1
 	github.com/stretchr/testify v1.12.1
