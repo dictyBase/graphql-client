@@ -3,7 +3,17 @@ package main
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"text/tabwriter"
+	"time"
+
+	A "github.com/IBM/fp-go/v2/array"
+	F "github.com/IBM/fp-go/v2/function"
+	O "github.com/IBM/fp-go/v2/option"
+	"github.com/nao1215/markdown"
+
+	predarrays "github.com/dictyBase/fp-go-loom/predicate/array"
+	"github.com/dictyBase/fp-go-loom/strutils"
 )
 
 const tabPadding = 3
@@ -65,4 +75,112 @@ func writeStockSearchSummary(w io.Writer, result SearchStocksResult) {
 
 func writeCreatedOrder(w io.Writer, id string) {
 	fmt.Fprintf(w, "Order created: %s\n", id)
+}
+
+func formatDurationCompact(d time.Duration) string {
+	return d.Round(time.Millisecond).String()
+}
+
+func formatOperationHealthRow(op OperationHealth) []string {
+	return []string{
+		markdown.Code(op.Operation),
+		op.RouteArea,
+		fmt.Sprintf("%d/%d", op.Passed, op.Total),
+		strconv.Itoa(op.Failed),
+		formatDurationCompact(op.Latency),
+		markdown.Bold(op.Status),
+	}
+}
+
+func formatFailureBullet(failure LivenessProbeOutcome) string {
+	opCode := markdown.Code(failure.Probe.Operation)
+	probeLabel := markdown.Code(failure.Probe.Label)
+	opHeader := strutils.Space.Concat(
+		markdown.Bold(opCode),
+		strutils.Parens(probeLabel),
+	)
+	return strutils.Label.Concat(
+		opHeader,
+		markdown.Code(failure.ErrorMsg),
+	)
+}
+
+func buildLivenessSummaryTable(report LivenessReport) markdown.TableSet {
+	return markdown.TableSet{
+		Header: []string{
+			"Endpoint",
+			"Status",
+			"Probes",
+			"Passed",
+			"Failed",
+			"Duration",
+		},
+		Rows: [][]string{
+			{
+				markdown.Code(report.Endpoint),
+				markdown.Bold(report.Status),
+				strconv.Itoa(report.Total),
+				strconv.Itoa(report.Passed),
+				strconv.Itoa(report.Failed),
+				formatDurationCompact(report.Duration),
+			},
+		},
+		Alignment: []markdown.TableAlignment{
+			markdown.AlignLeft,
+			markdown.AlignLeft,
+			markdown.AlignRight,
+			markdown.AlignRight,
+			markdown.AlignRight,
+			markdown.AlignRight,
+		},
+	}
+}
+
+func buildOperationHealthTable(ops []OperationHealth) markdown.TableSet {
+	return markdown.TableSet{
+		Header: []string{
+			"Operation",
+			"Route Area",
+			"Passed",
+			"Failed",
+			"Latency",
+			"Status",
+		},
+		Rows: F.Pipe1(ops, A.Map(formatOperationHealthRow)),
+		Alignment: []markdown.TableAlignment{
+			markdown.AlignLeft,
+			markdown.AlignLeft,
+			markdown.AlignRight,
+			markdown.AlignRight,
+			markdown.AlignRight,
+			markdown.AlignLeft,
+		},
+	}
+}
+
+func buildFailureSummaryLines(failures []LivenessProbeOutcome) []string {
+	return F.Pipe2(
+		failures,
+		O.FromPredicate(predarrays.IsNonEmpty[LivenessProbeOutcome]()),
+		O.Fold(
+			func() []string {
+				return []string{"All GraphQL liveness probes passed."}
+			},
+			A.Map(formatFailureBullet),
+		),
+	)
+}
+
+func writeLivenessMarkdown(w io.Writer, report LivenessReport) error {
+	summaryTable := buildLivenessSummaryTable(report)
+	opTable := buildOperationHealthTable(report.Operations)
+	failureLines := buildFailureSummaryLines(report.Failures)
+	return markdown.NewMarkdown(w, markdown.WithBlockSpacing()).
+		H1("GraphQL API Liveness Report").
+		Table(summaryTable).
+		H2("Operation Health").
+		Table(opTable).
+		H2("Failure Summary").
+		BulletList(failureLines...).
+		Build()
 }

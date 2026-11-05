@@ -43,3 +43,7 @@ func errInvalidStatus(s string) error {
 		s,
 	)
 }
+
+func errNullProbeRoot(field string) error {
+	return fmt.Errorf("empty or null data for %s", field)
+}

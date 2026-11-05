@@ -32,6 +32,7 @@ const (
 	flagStatus         = "status"
 	flagQuery          = "query"
 	flagEntity         = "entity"
+	flagTimeout        = "timeout"
 )
 
 const usageEndpoint = "GraphQL API endpoint URL"
@@ -64,6 +65,7 @@ func main() {
 			newListFilteredStrainsCommand(),
 			newSearchStocksCommand(),
 			newCreateOrderCommand(),
+			newLivenessCheckCommand(),
 		},
 	}
 
