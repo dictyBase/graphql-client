@@ -10,19 +10,19 @@ jobs:
     with:
       repository: ${{ github.repository }}
       ref: ${{ github.sha }}
-      version: "v2.8.0-alpine"
+      version: "v2.14.0-alpine"
 
   test:
     name: Test
     runs-on: ubuntu-latest
     needs: lint
     steps:
+      - name: check out code
+        uses: actions/checkout@v6
       - name: set up golang
         uses: actions/setup-go@v6
         with:
-          go-version: 1.25
-      - name: check out code
-        uses: actions/checkout@v6
+          go-version-file: go.mod
       - name: unit test
         run: go test -covermode=atomic -coverprofile=profile.cov -v ./...
         env:
