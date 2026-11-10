@@ -1,4 +1,4 @@
-module github.com/dictybase-docker/graphql-client
+module github.com/dictyBase/graphql-client
 
 go 1.26.0
 
